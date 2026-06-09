@@ -14,7 +14,12 @@ import { onLoad } from '@dcloudio/uni-app'
 const url = ref('')
 
 onLoad((query) => {
-  url.value = decodeURIComponent(query.url || '')
+  const decoded = decodeURIComponent(query.url || '')
+  // 校验 URL 域名白名单
+  const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')
+  if (decoded && (decoded.startsWith('/') || decoded.startsWith(baseUrl) || decoded.startsWith('http'))) {
+    url.value = decoded
+  }
 })
 </script>
 

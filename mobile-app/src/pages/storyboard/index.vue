@@ -71,6 +71,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { getEpisodeStoryboards, updateStoryboard } from '@/api/storyboard'
 import { createImage } from '@/api/image'
 import { createVideo } from '@/api/video'

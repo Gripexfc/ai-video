@@ -118,24 +118,28 @@ function getRechargeUrl() {
   return window.location.origin + '/credits'
   // #endif
   // #ifndef H5
-  return 'https://' + (window?.location?.host || '') + '/credits'
+  const baseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')
+  return baseUrl + '/credits'
   // #endif
 }
 
 // 充值按钮
 function handleRecharge() {
+  const url = getRechargeUrl()
+  if (!url) return
+
   // #ifdef H5
-  window.open(getRechargeUrl(), '_blank')
+  window.open(url, '_blank')
   // #endif
 
   // #ifdef MP
   uni.navigateTo({
-    url: '/pages/webview/index?url=' + encodeURIComponent(getRechargeUrl()),
+    url: '/pages/webview/index?url=' + encodeURIComponent(url),
   })
   // #endif
 
   // #ifdef APP-PLUS
-  plus.runtime.openURL(getRechargeUrl())
+  plus.runtime.openURL(url)
   // #endif
 }
 

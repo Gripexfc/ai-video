@@ -22,8 +22,14 @@ export const useUserStore = defineStore('user', () => {
     try {
       const profile = await getProfile()
       setUser(profile)
-    } catch {
-      logout()
+      if (profile.credits !== undefined) {
+        credits.value = profile.credits
+      }
+    } catch (err) {
+      // 只在认证失败时 logout，网络错误静默处理
+      if (err.message === '未登录或登录已过期') {
+        logout()
+      }
     }
   }
 

@@ -1,5 +1,8 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
+// 401 跳转锁，防止并发请求重复跳转
+let isRedirecting = false
+
 function getToken() {
   return uni.getStorageSync('user_token') || ''
 }
@@ -25,8 +28,14 @@ function request({ url, method, data, header = {} }) {
 
         // 401 未登录 - 清除 token 并跳转登录页
         if (statusCode === 401) {
-          uni.removeStorageSync('user_token')
-          uni.reLaunch({ url: '/pages/login/index' })
+          if (!isRedirecting) {
+            isRedirecting = true
+            uni.removeStorageSync('user_token')
+            uni.reLaunch({
+              url: '/pages/login/index',
+              complete() { isRedirecting = false }
+            })
+          }
           reject(new Error('未登录或登录已过期'))
           return
         }

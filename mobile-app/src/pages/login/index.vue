@@ -122,6 +122,8 @@ async function handleSubmit() {
       const res = await login(payload)
       userStore.setToken(res.token)
       userStore.setUser(res)
+      // 登录后同步积分
+      userStore.fetchProfile()
       uni.showToast({ title: '登录成功', icon: 'success' })
       setTimeout(() => {
         uni.switchTab({ url: '/pages/home/index' })

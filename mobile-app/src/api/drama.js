@@ -1,5 +1,4 @@
-import { get, post, del } from './request'
-import { put } from './request'
+import { get, post, put, del } from './request'
 
 export function listDramas(params) { return get('/dramas', params) }
 export function createDrama(data) { return post('/dramas', data) }
