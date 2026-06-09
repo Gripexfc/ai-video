@@ -1,0 +1,88 @@
+{
+  "pages": [
+    {
+      "path": "pages/home/index",
+      "style": {
+        "navigationBarTitleText": "视频喵",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/preview/index",
+      "style": {
+        "navigationBarTitleText": "作品",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/mine/index",
+      "style": {
+        "navigationBarTitleText": "我的",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "登录",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/create/index",
+      "style": {
+        "navigationBarTitleText": "创作",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/storyboard/index",
+      "style": {
+        "navigationBarTitleText": "分镜",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/webview/index",
+      "style": {
+        "navigationBarTitleText": "",
+        "navigationStyle": "custom"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "视频喵",
+    "navigationBarBackgroundColor": "#0d0d1a",
+    "backgroundColor": "#0d0d1a",
+    "app-plus": {
+      "titleNView": false
+    }
+  },
+  "tabBar": {
+    "color": "#666666",
+    "selectedColor": "#7c5cfc",
+    "borderStyle": "black",
+    "backgroundColor": "#1a1a2e",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "static/tab-home.png",
+        "selectedIconPath": "static/tab-home-active.png"
+      },
+      {
+        "pagePath": "pages/preview/index",
+        "text": "作品",
+        "iconPath": "static/tab-preview.png",
+        "selectedIconPath": "static/tab-preview-active.png"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的",
+        "iconPath": "static/tab-mine.png",
+        "selectedIconPath": "static/tab-mine-active.png"
+      }
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "视频喵",
+  "appid": "",
+  "description": "AI 视频创作工具",
+  "versionName": "0.0.1",
+  "versionCode": "100",
+  "transformPx": false,
+  "vueVersion": "3",
+  "h5": {
+    "title": "视频喵",
+    "router": {
+      "mode": "hash",
+      "base": "./"
+    },
+    "devServer": {
+      "port": 5174,
+      "disableHostCheck": true
+    }
+  },
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "postcss": true,
+      "minified": true
+    },
+    "usingComponents": true
+  }
+}
