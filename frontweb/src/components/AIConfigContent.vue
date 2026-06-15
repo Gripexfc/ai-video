@@ -58,6 +58,20 @@
               一键换Key
             </el-button>
           </div>
+          <!-- 配置状态清单 -->
+          <div v-if="configChecklist.length > 0" class="config-checklist">
+            <span class="checklist-label">配置状态：</span>
+            <span
+              v-for="item in configChecklist"
+              :key="item.key"
+              class="checklist-item"
+              :class="{ 'checklist-done': item.configured }"
+            >
+              <svg v-if="item.configured" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"/></svg>
+              {{ item.label }}
+            </span>
+          </div>
           <p class="default-tip">每种服务类型仅有一个默认配置：文本用于生成故事；文本生成图片用于角色/场景/道具图；分镜图片生成用于分镜图（支持参考图）；视频用于生成视频；语音合成 TTS 用于分镜配音。</p>
           <el-table
             v-loading="loading"
@@ -1627,6 +1641,23 @@ async function loadList() {
   }
 }
 
+const configChecklist = computed(() => {
+  const types = [
+    { key: 'text', label: '文本', required: true },
+    { key: 'image', label: '图片', required: true },
+    { key: 'storyboard_image', label: '分镜图', required: true },
+    { key: 'video', label: '视频', required: true },
+    { key: 'tts', label: '语音', required: false },
+  ]
+  const configuredTypes = new Set(
+    (list.value || []).map(c => c.service_type).filter(Boolean)
+  )
+  return types.map(t => ({
+    ...t,
+    configured: configuredTypes.has(t.key),
+  }))
+})
+
 function parseModelText(text) {
   if (!text || !String(text).trim()) return []
   return String(text)
@@ -2118,7 +2149,7 @@ onMounted(() => {
 /* 过渡动画 */
 .fade-slide-enter-active,
 .fade-slide-leave-active {
-  transition: all 0.2s ease;
+  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease;
 }
 .fade-slide-enter-from,
 .fade-slide-leave-to {
@@ -2132,7 +2163,7 @@ onMounted(() => {
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
-  border-radius: 20px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -2155,11 +2186,11 @@ onMounted(() => {
   color: #10b981;
   border-color: rgba(16, 185, 129, 0.25);
 }
-/* 分镜图片生成 — 紫色 */
+/* 分镜图片生成 — amber */
 .type-storyboard_image {
-  background: rgba(139, 92, 246, 0.12);
-  color: #8b5cf6;
-  border-color: rgba(139, 92, 246, 0.25);
+  background: rgba(224, 145, 90, 0.12);
+  color: #d4915a;
+  border-color: rgba(224, 145, 90, 0.25);
 }
 /* 视频 — 橙色 */
 .type-video {
@@ -2204,7 +2235,7 @@ onMounted(() => {
 }
 .one-key-section {
   background: var(--el-fill-color-light, #f5f7fa);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 12px 14px;
 }
 .one-key-section-title {
@@ -2242,7 +2273,7 @@ onMounted(() => {
 code {
   background: var(--el-fill-color, #f0f2f5);
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-family: monospace;
 }
@@ -2257,10 +2288,37 @@ code {
   margin: 0 0 16px;
   padding: 10px 12px;
   background: #f0f9ff;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   color: #0369a1;
   line-height: 1.5;
+}
+.config-checklist {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: var(--bg-inner);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-muted);
+}
+.checklist-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.checklist-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+.checklist-item svg { flex-shrink: 0; }
+.checklist-done {
+  color: #4ade80;
 }
 .vendor-lock-bar {
   display: flex;
@@ -2311,7 +2369,7 @@ code {
   display: inline-block;
   font-size: 11px;
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   margin-right: 6px;
   font-weight: 600;
   vertical-align: middle;
@@ -2333,7 +2391,7 @@ code {
 }
 .protocol-help .ph-body pre {
   background: #f5f7fa;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 8px 12px;
   font-size: 12px;
   line-height: 1.6;
@@ -2345,7 +2403,7 @@ code {
 .protocol-help .ph-body code {
   background: #f0f2f5;
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
 }
 .tip-icon {
@@ -2361,7 +2419,7 @@ code {
 .endpoint-preview-box {
   background: #f0f7ff;
   border: 1px solid #c6e0ff;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 10px 14px;
   margin: -4px 0 14px;
   font-size: 12px;
@@ -2379,7 +2437,7 @@ code {
   background: #e6f1ff;
   color: #409eff;
   border: 1px solid #b3d8ff;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   padding: 0 5px;
   font-size: 11px;
   font-weight: 400;
@@ -2404,7 +2462,7 @@ code {
   color: #303133;
   background: rgba(255,255,255,0.7);
   border: 1px solid #dce8fa;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   padding: 1px 6px;
   font-family: 'Menlo', 'Consolas', monospace;
   font-size: 11.5px;
@@ -2466,7 +2524,7 @@ code {
 .gs-tip-box {
   margin-top: 20px;
   background: #f5f7fa;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 14px 16px;
   font-size: 13px;
 }

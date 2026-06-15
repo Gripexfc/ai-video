@@ -3,7 +3,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { propAPI } from '@/api/props'
 import { propLibraryAPI } from '@/api/propLibrary'
 import { uploadAPI } from '@/api/upload'
-import { createLibraryMembershipState, hasAssetInLibrary, loadLibraryMembership, markAssetInLibrary } from './libraryMembership'
+import { dataUrlToFile } from '@/utils/dataUrlToFile'
+import { useLibraryManagement } from './useLibraryManagement'
 
 /**
  * 道具管理 Composable
@@ -21,15 +22,6 @@ import { createLibraryMembershipState, hasAssetInLibrary, loadLibraryMembership,
 export function useProps(deps) {
   const { store, dramaId, currentEpisodeId, getSelectedStyle, getAssetImageModel, loadDrama, pollTask, pollUntilResourceHasImage, hasAssetImage } = deps
 
-  function dataUrlToFile(dataUrl, filename) {
-    const arr = dataUrl.split(',')
-    const mime = (arr[0].match(/:(.*?);/) || [])[1] || 'image/png'
-    const bstr = atob(arr[1])
-    let n = bstr.length
-    const u8arr = new Uint8Array(n)
-    while (n--) u8arr[n] = bstr.charCodeAt(n)
-    return new File([u8arr], filename || 'reference.png', { type: mime })
-  }
 
   // ── 道具弹窗状态 ──────────────────────────────────────
   const showAddProp = ref(false)
@@ -54,22 +46,69 @@ export function useProps(deps) {
   const propsExtracting = ref(false)
   const generatingPropIds = reactive(new Set())
 
-  // ── 道具库状态 ────────────────────────────────────────
-  const showPropLibrary = ref(false)
-  const propLibraryList = ref([])
-  const propLibraryLoading = ref(false)
-  const propLibraryPage = ref(1)
-  const propLibraryPageSize = ref(20)
-  const propLibraryTotal = ref(0)
-  const propLibraryKeyword = ref('')
-  const showEditPropLibrary = ref(false)
-  const editPropLibraryForm = ref(null)
-  const editPropLibrarySaving = ref(false)
-  const addingPropToLibraryId = ref(null)
-  const addingPropToMaterialId = ref(null)
-  const addingPropFromLibraryId = ref(null)
-  const propMembership = createLibraryMembershipState()
-  let propLibraryKeywordTimer = null
+  // ── 道具库（通过 useLibraryManagement 工厂） ────────────
+  const lib = useLibraryManagement({
+    assetType: '道具',
+    dramaId,
+    loadDrama,
+    hasAssetImage,
+    api: propLibraryAPI,
+    assetApi: propAPI,
+    store,
+    getAssets: () => store.props || [],
+    getAssetName: (item) => (item.name || '未命名').slice(0, 20),
+    addAssetFromLibrary: async (item) => {
+      if (!store.dramaId || !currentEpisodeId.value) return
+      const existingProp = (store.props || []).find((p) => p.name === item.name)
+      if (existingProp) {
+        await propAPI.update(existingProp.id, {
+          name: item.name || existingProp.name,
+          type: item.type || existingProp.type || undefined,
+          description: item.description || existingProp.description || undefined,
+          prompt: item.prompt || existingProp.prompt || undefined,
+          image_url: item.image_url || existingProp.image_url || undefined,
+          local_path: item.local_path || existingProp.local_path || undefined,
+        })
+        ElMessage.success(`「${item.name || '道具'}」已更新到本集`)
+      } else {
+        await propAPI.create({
+          drama_id: store.dramaId,
+          episode_id: currentEpisodeId.value,
+          name: item.name || '',
+          type: item.type || undefined,
+          description: item.description || undefined,
+          prompt: item.prompt || undefined,
+          image_url: item.image_url || undefined,
+          local_path: item.local_path || undefined,
+        })
+        ElMessage.success(`「${item.name || '道具'}」已加入本集`)
+      }
+      await loadDrama()
+    },
+  })
+  // 重命名为组件期望的变量名
+  const showPropLibrary = lib.showLibrary
+  const propLibraryList = lib.libraryList
+  const propLibraryLoading = lib.libraryLoading
+  const propLibraryPage = lib.libraryPage
+  const propLibraryPageSize = lib.libraryPageSize
+  const propLibraryTotal = lib.libraryTotal
+  const propLibraryKeyword = lib.libraryKeyword
+  const showEditPropLibrary = lib.showEditLibrary
+  const editPropLibraryForm = lib.editLibraryForm
+  const editPropLibrarySaving = lib.editLibrarySaving
+  const addingPropToLibraryId = lib.addingToLibraryId
+  const addingPropToMaterialId = lib.addingToMaterialId
+  const addingPropFromLibraryId = lib.addingFromLibraryId
+  const loadPropLibraryList = lib.loadLibraryList
+  const debouncedLoadPropLibrary = lib.debouncedLoadLibrary
+  const onAddPropToLibrary = lib.onAddToLibrary
+  const onAddPropToMaterialLibrary = lib.onAddToMaterialLibrary
+  const loadPropLibraryMembership = lib.loadMembership
+  const isPropInLibrary = lib.isInLibrary
+  const isPropInMaterialLibrary = lib.isInMaterialLibrary
+  const onAddPropFromLibrary = lib.onAddFromLibrary
+  const onDeletePropLibrary = lib.onDeleteLibrary
 
   // ── 函数 ──────────────────────────────────────────────
   async function onExtractProps() {
@@ -299,165 +338,19 @@ export function useProps(deps) {
     }
   }
 
-  // ── 道具库函数 ────────────────────────────────────────
-  async function loadPropLibraryList() {
-    propLibraryLoading.value = true
-    try {
-      const res = await propLibraryAPI.list({
-        drama_id: dramaId.value,
-        page: propLibraryPage.value,
-        page_size: propLibraryPageSize.value,
-        keyword: propLibraryKeyword.value || undefined
-      })
-      propLibraryList.value = res?.items ?? []
-      const pagination = res?.pagination ?? {}
-      propLibraryTotal.value = pagination.total ?? 0
-      if (pagination.page != null) propLibraryPage.value = pagination.page
-      if (pagination.page_size != null) propLibraryPageSize.value = pagination.page_size
-    } catch (e) {
-      propLibraryList.value = []
-    } finally {
-      propLibraryLoading.value = false
-    }
-  }
-
-  function debouncedLoadPropLibrary() {
-    if (propLibraryKeywordTimer) clearTimeout(propLibraryKeywordTimer)
-    propLibraryKeywordTimer = setTimeout(() => {
-      propLibraryPage.value = 1
-      loadPropLibraryList()
-    }, 300)
-  }
+  // ── 道具库函数（由 useLibraryManagement 工厂提供，仅保留适配器）──
 
   function openEditPropLibrary(item) {
-    editPropLibraryForm.value = {
-      id: item.id,
+    lib.openEditLibrary(item, {
       name: item.name ?? '',
       category: item.category ?? '',
       description: item.description ?? '',
-      tags: item.tags ?? ''
-    }
-    showEditPropLibrary.value = true
-  }
-
-  async function submitEditPropLibrary() {
-    if (!editPropLibraryForm.value?.id) return
-    editPropLibrarySaving.value = true
-    try {
-      await propLibraryAPI.update(editPropLibraryForm.value.id, {
-        name: editPropLibraryForm.value.name,
-        category: editPropLibraryForm.value.category || null,
-        description: editPropLibraryForm.value.description || null,
-        tags: editPropLibraryForm.value.tags || null
-      })
-      ElMessage.success('已保存')
-      showEditPropLibrary.value = false
-      loadPropLibraryList()
-    } catch (e) {
-      ElMessage.error(e.message || '保存失败')
-    } finally {
-      editPropLibrarySaving.value = false
-    }
-  }
-
-  async function onDeletePropLibrary(item) {
-    try {
-      await ElMessageBox.confirm(
-        `确定删除公共道具「${(item.name || '未命名').slice(0, 20)}」吗？`,
-        '删除确认',
-        { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
-      )
-      await propLibraryAPI.delete(item.id)
-      ElMessage.success('已删除')
-      loadPropLibraryList()
-    } catch (e) {
-      if (e === 'cancel') return
-      ElMessage.error(e.message || '删除失败')
-    }
-  }
-
-  async function onAddPropToLibrary(prop) {
-    if (!hasAssetImage(prop)) { ElMessage.warning('请先为该道具生成或上传图片'); return }
-    addingPropToLibraryId.value = prop.id
-    try {
-      await propAPI.addToLibrary(prop.id, {})
-      markAssetInLibrary(propMembership.dramaSourceIds, prop)
-      ElMessage.success('已加入本剧道具库')
-      if (showPropLibrary.value) loadPropLibraryList()
-    } catch (e) {
-      ElMessage.error(e.message || '加入失败')
-    } finally {
-      addingPropToLibraryId.value = null
-    }
-  }
-
-  async function onAddPropToMaterialLibrary(prop) {
-    if (!hasAssetImage(prop)) { ElMessage.warning('请先为该道具生成或上传图片'); return }
-    addingPropToMaterialId.value = prop.id
-    try {
-      await propAPI.addToMaterialLibrary(prop.id)
-      markAssetInLibrary(propMembership.materialSourceIds, prop)
-      ElMessage.success('已加入全局素材库')
-    } catch (e) {
-      ElMessage.error(e.message || '加入失败')
-    } finally {
-      addingPropToMaterialId.value = null
-    }
-  }
-
-  async function loadPropLibraryMembership() {
-    await loadLibraryMembership({
-      api: propLibraryAPI,
-      sourceType: 'prop',
-      assets: store.props || [],
-      dramaId: dramaId.value,
-      dramaSourceIds: propMembership.dramaSourceIds,
-      materialSourceIds: propMembership.materialSourceIds,
+      tags: item.tags ?? '',
     })
   }
 
-  function isPropInLibrary(prop) {
-    return hasAssetInLibrary(propMembership.dramaSourceIds, prop)
-  }
-
-  function isPropInMaterialLibrary(prop) {
-    return hasAssetInLibrary(propMembership.materialSourceIds, prop)
-  }
-
-  async function onAddPropFromLibrary(item) {
-    if (!store.dramaId || !currentEpisodeId.value) return
-    addingPropFromLibraryId.value = item.id
-    try {
-      const existingProp = (store.props || []).find((p) => p.name === item.name)
-      if (existingProp) {
-        await propAPI.update(existingProp.id, {
-          name: item.name || existingProp.name,
-          type: item.type || existingProp.type || undefined,
-          description: item.description || existingProp.description || undefined,
-          prompt: item.prompt || existingProp.prompt || undefined,
-          image_url: item.image_url || existingProp.image_url || undefined,
-          local_path: item.local_path || existingProp.local_path || undefined,
-        })
-        ElMessage.success(`「${item.name || '道具'}」已更新到本集`)
-      } else {
-        await propAPI.create({
-          drama_id: store.dramaId,
-          episode_id: currentEpisodeId.value,
-          name: item.name || '',
-          type: item.type || undefined,
-          description: item.description || undefined,
-          prompt: item.prompt || undefined,
-          image_url: item.image_url || undefined,
-          local_path: item.local_path || undefined,
-        })
-        ElMessage.success(`「${item.name || '道具'}」已加入本集`)
-      }
-      await loadDrama()
-    } catch (e) {
-      ElMessage.error(e.message || '加入失败')
-    } finally {
-      addingPropFromLibraryId.value = null
-    }
+  async function submitEditPropLibrary() {
+    await lib.submitEditLibrary(['name', 'category', 'description', 'tags'])
   }
 
   // ── 添加道具简单弹窗的参考图 extract ─────────────────
@@ -478,6 +371,13 @@ export function useProps(deps) {
     } finally {
       extractingPropAddDesc.value = false
     }
+  }
+
+  /**
+   * 清理所有计时器和轮询，组件卸载时调用
+   */
+  function cleanup() {
+    if (editPropPollTimer) { clearInterval(editPropPollTimer); editPropPollTimer = null }
   }
 
   return {
@@ -537,5 +437,6 @@ export function useProps(deps) {
     onAddPropToMaterialLibrary,
     onAddPropFromLibrary,
     doExtractFromRef2,
+    cleanup,
   }
 }

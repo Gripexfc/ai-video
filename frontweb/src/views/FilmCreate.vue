@@ -1,130 +1,32 @@
 <template>
   <div class="film-create" :class="{ 'sidebar-collapsed': navCollapsed }">
     <!-- 顶部 -->
-    <header class="header">
-      <div class="header-inner">
-        <h1 class="logo" @click="goList">
-          <span class="logo-main">本地短剧助手</span>
-          <span class="logo-sub">LocalMiniDrama</span>
-        </h1>
-        <span class="breadcrumb-sep">›</span>
-        <span class="page-title">{{ dramaId ? (store.drama?.title || '项目') : '新建故事' }}</span>
-        <el-button v-if="dramaId" class="btn-back-drama" @click="router.push('/drama/' + dramaId)">
-          <el-icon><ArrowLeft /></el-icon>
-          返回剧集
-        </el-button>
-        <div class="header-actions">
-          <el-button class="btn-theme" :title="isDark ? '切换到浅色模式' : '切换到暗色模式'" @click="toggleTheme">
-            <el-icon><Sunny v-if="isDark" /><Moon v-else /></el-icon>
-            {{ isDark ? '浅色' : '暗色' }}
-          </el-button>
-          <el-button class="btn-ai-config" @click="showAiConfigDialog = true">
-            <el-icon><Setting /></el-icon>
-            AI配置
-          </el-button>
-        </div>
-      </div>
-    </header>
+    <AppHeader
+      :drama-id="dramaId"
+      :drama-title="store.drama?.title"
+      :is-dark="isDark"
+      @go-list="goList"
+      @go-back-drama="router.push('/drama/' + dramaId)"
+      @toggle-theme="toggleTheme"
+      @open-ai-config="showAiConfigDialog = true"
+    />
 
     <!-- 左侧固定侧边栏 -->
-    <nav class="quick-nav" :class="{ collapsed: navCollapsed }" aria-label="快捷导航">
-      <div class="nav-sidebar-header">
-        <span v-if="!navCollapsed" class="nav-sidebar-title">导航</span>
-        <div class="nav-toggle" :title="navCollapsed ? '展开导航' : '收起导航'" @click="toggleNav()">
-          <el-icon><Expand v-if="navCollapsed" /><Fold v-else /></el-icon>
-        </div>
-      </div>
-
-      <!-- 步骤列表 -->
-      <div class="nav-steps">
-        <div
-          v-for="(step, idx) in navSteps"
-          :key="step.key"
-          class="nav-step"
-          :class="['status-' + step.status]"
-          @click="scrollToAnchor(step.anchor)"
-        >
-          <!-- 左侧连接线 -->
-          <div class="step-connector-wrap">
-            <div v-if="idx > 0" class="step-line step-line-top" :class="{ filled: navSteps[idx - 1].status === 'done' }" />
-            <div
-              class="step-dot"
-              :class="['dot-' + step.status]"
-            >
-              <el-icon v-if="step.status === 'done'" class="dot-icon"><Check /></el-icon>
-              <el-icon v-else-if="step.status === 'generating'" class="dot-icon spin"><Loading /></el-icon>
-              <span v-else class="dot-num">{{ idx + 1 }}</span>
-            </div>
-            <div v-if="idx < navSteps.length - 1" class="step-line step-line-bottom" :class="{ filled: step.status === 'done' }" />
-          </div>
-
-          <!-- 右侧文字 + 状态徽章 -->
-          <div class="step-body">
-            <span class="step-label">{{ step.label }}</span>
-            <span v-if="step.count > 0 && step.status !== 'done'" class="step-count">{{ step.count }}</span>
-            <span v-if="step.status === 'partial'" class="step-badge partial-badge" title="部分完成">
-              <el-icon><WarningFilled /></el-icon>
-            </span>
-            <span v-else-if="step.status === 'generating'" class="step-badge gen-badge" title="生成中">
-              <el-icon class="spin"><Loading /></el-icon>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 分镜子列表 -->
-      <div v-if="!navCollapsed && storyboards.length > 0" class="nav-group">
-        <div class="nav-sub-toggle" @click="storyboardMenuExpanded = !storyboardMenuExpanded">
-          <el-icon><Minus v-if="storyboardMenuExpanded" /><Plus v-else /></el-icon>
-          <span>分镜列表</span>
-        </div>
-        <div v-show="storyboardMenuExpanded" class="nav-sub-list">
-          <template v-for="(sb, i) in storyboards" :key="sb.id">
-            <!-- 段落标题行 -->
-            <div
-              v-if="sb.segment_title && (i === 0 || sb.segment_index !== storyboards[i - 1].segment_index)"
-              class="nav-segment-label"
-            >
-              <span class="nav-segment-dot" />
-              {{ sb.segment_title }}
-            </div>
-            <div
-              class="nav-sub-item"
-              :title="sb.title || '分镜 ' + (i + 1)"
-              @click="scrollToAnchor('sb-' + sb.id)"
-            >
-              {{ i + 1 }}. {{ sb.title || '分镜' }}
-            </div>
-          </template>
-        </div>
-      </div>
-
-      <!-- 当前任务面板 -->
-      <div v-if="allActiveTasks.length > 0" class="atp-panel">
-        <!-- 折叠态：只显示旋转点和数量 -->
-        <div v-if="navCollapsed" class="atp-collapsed-badge" :title="allActiveTasks.join('\n')">
-          <span class="atp-spin-dot" />
-          <span class="atp-collapsed-count">{{ allActiveTasks.length }}</span>
-        </div>
-        <!-- 展开态：标题 + 任务列表 -->
-        <template v-else>
-          <div class="atp-header">
-            <span class="atp-spin-dot" />
-            <span class="atp-title">进行中</span>
-            <span class="atp-count-badge">{{ allActiveTasks.length }}</span>
-          </div>
-          <div class="atp-list">
-            <div v-for="(label, i) in allActiveTasks.slice(0, 8)" :key="i" class="atp-item">
-              <span class="atp-item-dot" />
-              <span class="atp-item-label">{{ label }}</span>
-            </div>
-            <div v-if="allActiveTasks.length > 8" class="atp-more">
-              还有 {{ allActiveTasks.length - 8 }} 个任务...
-            </div>
-          </div>
-        </template>
-      </div>
-    </nav>
+    <SidebarNav
+      :nav-collapsed="navCollapsed"
+      :storyboard-menu-expanded="storyboardMenuExpanded"
+      :nav-steps="navSteps"
+      :storyboards="storyboards"
+      :all-active-tasks="allActiveTasks"
+      :pipeline-running="pipelineRunning"
+      :drama-id="dramaId"
+      :current-episode-id="currentEpisodeId"
+      :scroll-to-anchor="scrollToAnchor"
+      @toggle-nav="toggleNav()"
+      @scroll-to-anchor="scrollToAnchor"
+      @scroll-to-top="scrollToTop"
+      @toggle-storyboard-menu="storyboardMenuExpanded = !storyboardMenuExpanded"
+    />
 
     <main class="main">
       <!-- 角色/道具/场景上传图片用，单例放在外层避免 v-for 导致 ref 为数组 -->
@@ -146,6 +48,10 @@
       <!-- 1. 故事生成 -->
       <section class="section card">
         <h2 class="section-title">故事生成</h2>
+        <div v-if="!scriptContent && !currentEpisodeId" class="welcome-tip">
+          <p>从这里开始你的创作之旅 🎬</p>
+          <p class="welcome-tip-sub">选择或新增一集，然后输入故事梗概，AI 将为你生成完整剧本</p>
+        </div>
         <p class="section-desc">输入一段故事梗概，AI 帮你扩写成完整剧本，或直接导入小说章节</p>
         <el-input
           v-model="storyInput"
@@ -188,7 +94,7 @@
 
       <!-- 2. 剧本编辑 -->
       <section id="anchor-script" class="section card">
-        <h2 class="section-title">剧本</h2>
+        <h2 class="section-title">剧本 <span v-if="scriptAutoSaveStatus === 'saving'" class="autosave-hint">保存中...</span><span v-else-if="scriptAutoSaveStatus === 'saved'" class="autosave-hint autosave-ok">已保存</span><span v-else-if="scriptAutoSaveStatus === 'error'" class="autosave-hint autosave-err">保存失败</span></h2>
         <!-- 行1：集数切换 + 集名 + 添加一集 -->
         <div class="row gap" style="margin-bottom: 10px; flex-wrap: wrap;">
           <el-select
@@ -206,6 +112,10 @@
               :value="ep.id"
             />
           </el-select>
+          <div v-if="dramaId && (store.drama?.episodes || []).length === 0" class="episode-empty-hint">
+            <el-icon><WarningFilled /></el-icon>
+            请先在下方「故事剧本」区域生成剧本，或手动添加一集
+          </div>
           <el-input v-model="scriptTitle" placeholder="集标题" style="width: 150px" />
           <el-button v-if="dramaId" style="margin-left: auto" @click="onAddEpisode">
             <el-icon><Plus /></el-icon>添加一集
@@ -369,915 +279,153 @@
       </section>
 
       <!-- 资源管理：角色 / 道具 / 场景 -->
-      <section class="section card resource-panel">
-        <div class="collapse-header" @click="resourcePanelCollapsed = !resourcePanelCollapsed">
-          <h2 class="section-title">资源管理</h2>
-          <el-icon class="collapse-icon"><ArrowUp v-if="!resourcePanelCollapsed" /><ArrowDown v-else /></el-icon>
-        </div>
-        <div v-show="!resourcePanelCollapsed" class="resource-panel-body">
-          <!-- 角色生成 -->
-          <div id="anchor-characters" class="resource-block card">
-            <div class="collapse-header resource-block-header" @click="charactersBlockCollapsed = !charactersBlockCollapsed">
-              <h3 class="resource-block-title">角色生成</h3>
-              <el-icon class="collapse-icon"><ArrowUp v-if="!charactersBlockCollapsed" /><ArrowDown v-else /></el-icon>
-            </div>
-            <div v-show="!charactersBlockCollapsed" class="resource-block-body">
-              <div class="asset-actions">
-                <el-button type="primary" size="small" :loading="charactersGenerating" :disabled="!dramaId" @click="onGenerateCharacters">
-                  剧本自动提取角色
-                </el-button>
-                <el-button size="small" :disabled="!dramaId" @click="openAddCharacter">添加角色</el-button>
-                <el-button size="small" @click="showCharLibrary = true">本剧角色库</el-button>
-              </div>
-              <div class="asset-list asset-list-two">
-                <div v-for="char in characters" :key="char.id" class="asset-item asset-item-left-right">
-                  <div class="asset-info">
-                    <div class="asset-name">
-                      <span style="display:inline-flex;align-items:center;gap:4px;flex:1;min-width:0;overflow:hidden">
-                        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ char.name }}</span>
-                        <el-tag v-if="char.role" size="small" effect="plain" :type="char.role === 'main' ? 'danger' : char.role === 'supporting' ? 'warning' : 'info'" style="flex-shrink:0;padding:0 5px;font-size:11px;height:18px;line-height:18px">{{ charRoleLabel(char.role) }}</el-tag>
-                      </span>
-                      <el-button type="danger" text size="small" class="btn-delete-icon" title="删除" @click="onDeleteCharacter(char)">
-                        <el-icon><Delete /></el-icon>
-                      </el-button>
-                    </div>
-                    <div class="asset-desc-full">{{ char.appearance || char.description || '暂无描述' }}</div>
-                    <div class="asset-btns">
-                      <el-button size="small" @click="editCharacter(char)">编辑</el-button>
-                      <el-button size="small" :type="isCharInLibrary(char) ? 'success' : ''" :loading="addingCharToLibraryId === char.id" :disabled="!hasAssetImage(char) || isCharInLibrary(char)" @click="onAddCharacterToLibrary(char)">
-                        {{ isCharInLibrary(char) ? '已加入本剧库' : '加入本剧库' }}
-                      </el-button>
-                      <el-button size="small" :type="isCharInMaterialLibrary(char) ? 'success' : ''" :loading="addingCharToMaterialId === char.id" :disabled="!hasAssetImage(char) || isCharInMaterialLibrary(char)" @click="onAddCharacterToMaterialLibrary(char)">
-                        {{ isCharInMaterialLibrary(char) ? '已加入素材库' : '加入素材库' }}
-                      </el-button>
-                      <span v-if="char.seedance2_asset?.status !== 'active'" class="sd2-cert-btn-wrap">
-                        <el-button
-                          size="small"
-                          type="warning"
-                          plain
-                          :loading="sd2CertifyingId === char.id"
-                          :disabled="!hasAssetImage(char)"
-                          title="将角色主图注册到即梦素材库（与官方接口一致），供 Seedance 2.0 / 即梦 2.0 等引用 asset://"
-                          @click="onSd2CertifyCharacter(char)"
-                        >
-                          SD2认证
-                        </el-button>
-                        <el-tooltip placement="top" :show-after="280" popper-class="sd2-cert-tooltip">
-                          <template #content>
-                            <div class="sd2-tooltip-inner">
-                              <div class="sd2-tooltip-status">{{ charSd2TagText(char) }}</div>
-                              <p class="sd2-tooltip-p">
-                                即梦 2.0 等模型需先在即梦素材库完成认证后方可引用本角色图（接口形态参见
-                                <a href="https://83zi.com/sd2realperson.html" target="_blank" rel="noopener noreferrer">官方素材管理 API 说明</a>，base_url 可换用自建或其它兼容网关）。
-                              </p>
-                            </div>
-                          </template>
-                          <span class="sd2-help-trigger" role="button" tabindex="0" aria-label="SD2 认证说明">
-                            <el-icon><QuestionFilled /></el-icon>
-                          </span>
-                        </el-tooltip>
-                      </span>
-                      <el-button
-                        v-if="char.seedance2_asset?.hub_asset_id && char.seedance2_asset?.status !== 'active'"
-                        size="small"
-                        link
-                        type="primary"
-                        :loading="sd2CertifyingId === char.id"
-                        @click="onSd2CertifyRefresh(char)"
-                      >
-                        刷新认证状态
-                      </el-button>
-                      <el-button
-                        v-if="char.seedance2_asset?.status === 'active'"
-                        size="small"
-                        type="success"
-                        plain
-                        title="查看即梦素材库中的 SD2 登记信息"
-                        @click="openCharSd2CertDialog(char)"
-                      >
-                        查看sd2认证
-                      </el-button>
-                    </div>
-                    <div v-if="getCharAffectedStoryboards(char.id).length" class="asset-storyboard-link">
-                      <span class="asl-label">影响的分镜：</span>
-                      <span
-                        v-for="sb in getCharAffectedStoryboards(char.id)"
-                        :key="sb.id"
-                        class="asl-chip"
-                        title="点击跳转到该分镜"
-                        @click="scrollToStoryboard(sb.id)"
-                      >#{{ sb.storyboard_number }}</span>
-                      <span v-if="regenSbImagesForAsset.has('char-' + char.id) && regenSbImagesProgress['char-' + char.id]" class="asl-progress">
-                        {{ regenSbImagesProgress['char-' + char.id].current }}/{{ regenSbImagesProgress['char-' + char.id].total }}
-                      </span>
-                      <el-button
-                        size="small"
-                        class="asl-regen-btn"
-                        :loading="regenSbImagesForAsset.has('char-' + char.id)"
-                        @click="onRegenAffectedSbImages('char-' + char.id, getCharAffectedStoryboards(char.id))"
-                      >
-                        <span v-if="!regenSbImagesForAsset.has('char-' + char.id)">↻ 重新生成分镜图</span>
-                      </el-button>
-                    </div>
-                  </div>
-                  <div class="asset-cover-wrap">
-                    <div
-                      class="asset-cover"
-                      :class="{ 'asset-cover--clickable': hasAssetImage(char), 'asset-cover--dragover': dragOverResourceKey === 'char-' + char.id }"
-                      role="button"
-                      tabindex="0"
-                      @click="hasAssetImage(char) && openImagePreview(assetImageUrl(char))"
-                      @dragover="onResourceDragOver($event, 'character', char.id)"
-                      @dragleave="onResourceDragLeave($event, 'char-' + char.id)"
-                      @drop="onResourceDrop($event, 'character', char.id)"
-                    >
-                      <img v-if="hasAssetImage(char)" :src="assetImageUrl(char)" class="cover-img" alt="" />
-                      <div v-else-if="char.error_msg || char.errorMsg" class="cover-placeholder error" :title="char.error_msg || char.errorMsg">{{ char.error_msg || char.errorMsg }}</div>
-                      <div v-else class="cover-placeholder">暂无图</div>
-                      <div v-if="dragOverResourceKey === 'char-' + char.id" class="asset-cover-drop-hint">松开上传</div>
-                    </div>
-                    <!-- 额外参考图条 -->
-                    <div v-if="parseExtraImages(char).length" class="extra-images-strip">
-                      <div v-for="ep in parseExtraImages(char)" :key="ep" class="extra-thumb" :title="'点击设为主图'">
-                        <img :src="localPathToUrl(ep)" alt="" @click="onSetPrimaryImage('character', char, ep)" />
-                        <button class="extra-thumb-remove" title="移除" @click.stop="onRemoveExtraImage('character', char, ep)">×</button>
-                      </div>
-                    </div>
-                    <div class="asset-cover-actions">
-                      <el-button type="primary" size="small" :loading="generatingCharIds.has(char.id)" @click="onGenerateCharacterImage(char)">
-                        <el-icon v-if="!generatingCharIds.has(char.id)"><MagicStick /></el-icon>
-                        AI 生成
-                      </el-button>
-                      <el-button type="success" size="small" :loading="uploadingResourceId === 'char-' + char.id" @click="onUploadResourceClick('character', char.id)">
-                        <el-icon v-if="uploadingResourceId !== 'char-' + char.id"><Upload /></el-icon>
-                        上传
-                      </el-button>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="characters.length === 0" class="empty-tip">暂无角色，请先「AI 生成角色」或在上一步保存剧本后提取</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 道具生成 -->
-          <div id="anchor-props" class="resource-block card">
-            <div class="collapse-header resource-block-header" @click="propsBlockCollapsed = !propsBlockCollapsed">
-              <h3 class="resource-block-title">道具生成</h3>
-              <el-icon class="collapse-icon"><ArrowUp v-if="!propsBlockCollapsed" /><ArrowDown v-else /></el-icon>
-            </div>
-            <div v-show="!propsBlockCollapsed" class="resource-block-body">
-              <div class="asset-actions">
-                <el-button type="primary" size="small" :loading="propsExtracting" :disabled="!currentEpisodeId" @click="onExtractProps">从剧本提取道具</el-button>
-                <el-button size="small" :disabled="!dramaId" @click="showAddProp = true">添加道具</el-button>
-                <el-button size="small" @click="showPropLibrary = true">本剧道具库</el-button>
-              </div>
-              <div class="asset-list asset-list-two">
-                <div v-for="prop in props" :key="prop.id" class="asset-item asset-item-left-right">
-                  <div class="asset-info">
-                    <div class="asset-name">
-                      <span>{{ prop.name }}</span>
-                      <el-button type="danger" text size="small" class="btn-delete-icon" title="删除" @click="onDeleteProp(prop)">
-                        <el-icon><Delete /></el-icon>
-                      </el-button>
-                    </div>
-                    <div class="asset-desc-full">{{ prop.description || prop.prompt || '暂无描述' }}</div>
-                    <div class="asset-btns">
-                      <el-button size="small" @click="editProp(prop)">编辑</el-button>
-                      <el-button size="small" :type="isPropInLibrary(prop) ? 'success' : ''" :loading="addingPropToLibraryId === prop.id" :disabled="!hasAssetImage(prop) || isPropInLibrary(prop)" @click="onAddPropToLibrary(prop)">
-                        {{ isPropInLibrary(prop) ? '已加入本剧库' : '加入本剧库' }}
-                      </el-button>
-                      <el-button size="small" :type="isPropInMaterialLibrary(prop) ? 'success' : ''" :loading="addingPropToMaterialId === prop.id" :disabled="!hasAssetImage(prop) || isPropInMaterialLibrary(prop)" @click="onAddPropToMaterialLibrary(prop)">
-                        {{ isPropInMaterialLibrary(prop) ? '已加入素材库' : '加入素材库' }}
-                      </el-button>
-                    </div>
-                  </div>
-                  <div class="asset-cover-wrap">
-                    <div
-                      class="asset-cover"
-                      :class="{ 'asset-cover--clickable': hasAssetImage(prop), 'asset-cover--dragover': dragOverResourceKey === 'prop-' + prop.id }"
-                      role="button"
-                      tabindex="0"
-                      @click="hasAssetImage(prop) && openImagePreview(assetImageUrl(prop))"
-                      @dragover="onResourceDragOver($event, 'prop', prop.id)"
-                      @dragleave="onResourceDragLeave($event, 'prop-' + prop.id)"
-                      @drop="onResourceDrop($event, 'prop', prop.id)"
-                    >
-                      <img v-if="hasAssetImage(prop)" :src="assetImageUrl(prop)" class="cover-img" alt="" />
-                      <div v-else-if="prop.error_msg || prop.errorMsg" class="cover-placeholder error" :title="prop.error_msg || prop.errorMsg">{{ prop.error_msg || prop.errorMsg }}</div>
-                      <div v-else class="cover-placeholder">暂无图</div>
-                      <div v-if="dragOverResourceKey === 'prop-' + prop.id" class="asset-cover-drop-hint">松开上传</div>
-                    </div>
-                    <div v-if="parseExtraImages(prop).length" class="extra-images-strip">
-                      <div v-for="ep in parseExtraImages(prop)" :key="ep" class="extra-thumb" title="点击设为主图">
-                        <img :src="localPathToUrl(ep)" alt="" @click="onSetPrimaryImage('prop', prop, ep)" />
-                        <button class="extra-thumb-remove" title="移除" @click.stop="onRemoveExtraImage('prop', prop, ep)">×</button>
-                      </div>
-                    </div>
-                    <div class="asset-cover-actions">
-                      <el-button type="primary" size="small" :loading="generatingPropIds.has(prop.id)" @click="onGeneratePropImage(prop)">
-                        <el-icon v-if="!generatingPropIds.has(prop.id)"><MagicStick /></el-icon>
-                        AI 生成
-                      </el-button>
-                      <el-button type="success" size="small" :loading="uploadingResourceId === 'prop-' + prop.id" @click="onUploadResourceClick('prop', prop.id)">
-                        <el-icon v-if="uploadingResourceId !== 'prop-' + prop.id"><Upload /></el-icon>
-                        上传
-                      </el-button>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="props.length === 0" class="empty-tip">暂无道具，可从剧本提取或添加</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 场景生成 -->
-          <div id="anchor-scenes" class="resource-block card">
-            <div class="collapse-header resource-block-header" @click="scenesBlockCollapsed = !scenesBlockCollapsed">
-              <h3 class="resource-block-title">场景生成</h3>
-              <el-icon class="collapse-icon"><ArrowUp v-if="!scenesBlockCollapsed" /><ArrowDown v-else /></el-icon>
-            </div>
-            <div v-show="!scenesBlockCollapsed" class="resource-block-body">
-              <div class="asset-actions">
-                <el-button type="primary" size="small" :loading="scenesExtracting" :disabled="!currentEpisodeId" @click="onExtractScenes">
-                  从剧本提取场景
-                </el-button>
-                <el-button size="small" :disabled="!dramaId" @click="openAddScene">添加场景</el-button>
-                <el-button size="small" @click="showSceneLibrary = true">本剧场景库</el-button>
-              </div>
-              <div class="asset-list asset-list-two">
-                <div v-for="scene in scenes" :key="scene.id" class="asset-item asset-item-left-right">
-                  <div class="asset-info">
-                    <div class="asset-name">
-                      <span>{{ scene.location }}</span>
-                      <el-button type="danger" text size="small" class="btn-delete-icon" title="删除" @click="onDeleteScene(scene)">
-                        <el-icon><Delete /></el-icon>
-                      </el-button>
-                    </div>
-                    <div class="asset-desc-full">{{ scene.description || scene.prompt || scene.time || '暂无描述' }}</div>
-                    <div class="asset-btns">
-                      <el-button size="small" @click="editScene(scene)">编辑</el-button>
-                      <el-button size="small" :type="isSceneInLibrary(scene) ? 'success' : ''" :loading="addingSceneToLibraryId === scene.id" :disabled="!hasAssetImage(scene) || isSceneInLibrary(scene)" @click="onAddSceneToLibrary(scene)">
-                        {{ isSceneInLibrary(scene) ? '已加入本剧库' : '加入本剧库' }}
-                      </el-button>
-                      <el-button size="small" :type="isSceneInMaterialLibrary(scene) ? 'success' : ''" :loading="addingSceneToMaterialId === scene.id" :disabled="!hasAssetImage(scene) || isSceneInMaterialLibrary(scene)" @click="onAddSceneToMaterialLibrary(scene)">
-                        {{ isSceneInMaterialLibrary(scene) ? '已加入素材库' : '加入素材库' }}
-                      </el-button>
-                    </div>
-                    <div v-if="getSceneAffectedStoryboards(scene.id).length" class="asset-storyboard-link">
-                      <span class="asl-label">影响的分镜：</span>
-                      <span
-                        v-for="sb in getSceneAffectedStoryboards(scene.id)"
-                        :key="sb.id"
-                        class="asl-chip"
-                        title="点击跳转到该分镜"
-                        @click="scrollToStoryboard(sb.id)"
-                      >#{{ sb.storyboard_number }}</span>
-                      <span v-if="regenSbImagesForAsset.has('scene-' + scene.id) && regenSbImagesProgress['scene-' + scene.id]" class="asl-progress">
-                        {{ regenSbImagesProgress['scene-' + scene.id].current }}/{{ regenSbImagesProgress['scene-' + scene.id].total }}
-                      </span>
-                      <el-button
-                        size="small"
-                        class="asl-regen-btn"
-                        :loading="regenSbImagesForAsset.has('scene-' + scene.id)"
-                        @click="onRegenAffectedSbImages('scene-' + scene.id, getSceneAffectedStoryboards(scene.id))"
-                      >
-                        <span v-if="!regenSbImagesForAsset.has('scene-' + scene.id)">↻ 重新生成分镜图</span>
-                      </el-button>
-                    </div>
-                  </div>
-                  <div class="asset-cover-wrap">
-                    <div
-                      class="asset-cover"
-                      :class="{ 'asset-cover--clickable': hasAssetImage(scene), 'asset-cover--dragover': dragOverResourceKey === 'scene-' + scene.id }"
-                      role="button"
-                      tabindex="0"
-                      @click="hasAssetImage(scene) && openImagePreview(assetImageUrl(scene))"
-                      @dragover="onResourceDragOver($event, 'scene', scene.id)"
-                      @dragleave="onResourceDragLeave($event, 'scene-' + scene.id)"
-                      @drop="onResourceDrop($event, 'scene', scene.id)"
-                    >
-                      <img v-if="hasAssetImage(scene)" :src="assetImageUrl(scene)" class="cover-img" alt="" />
-                      <div v-else-if="scene.error_msg || scene.errorMsg" class="cover-placeholder error" :title="scene.error_msg || scene.errorMsg">{{ scene.error_msg || scene.errorMsg }}</div>
-                      <div v-else class="cover-placeholder">暂无图</div>
-                      <div v-if="dragOverResourceKey === 'scene-' + scene.id" class="asset-cover-drop-hint">松开上传</div>
-                    </div>
-                    <div v-if="parseExtraImages(scene).length" class="extra-images-strip">
-                      <div v-for="ep in parseExtraImages(scene)" :key="ep" class="extra-thumb" title="点击设为主图">
-                        <img :src="localPathToUrl(ep)" alt="" @click="onSetPrimaryImage('scene', scene, ep)" />
-                        <button class="extra-thumb-remove" title="移除" @click.stop="onRemoveExtraImage('scene', scene, ep)">×</button>
-                      </div>
-                    </div>
-                    <div class="asset-cover-actions">
-                      <el-tooltip content="多角度图一张（正/侧/俯/仰）" placement="top">
-                        <el-button type="primary" size="small" :loading="generatingSceneIds.has(scene.id)" @click="onGenerateSceneImage(scene)">
-                          <el-icon v-if="!generatingSceneIds.has(scene.id)"><MagicStick /></el-icon>
-                          AI 生成
-                        </el-button>
-                      </el-tooltip>
-                      <el-button type="success" size="small" :loading="uploadingResourceId === 'scene-' + scene.id" @click="onUploadResourceClick('scene', scene.id)">
-                        <el-icon v-if="uploadingResourceId !== 'scene-' + scene.id"><Upload /></el-icon>
-                        上传
-                      </el-button>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="scenes.length === 0" class="empty-tip">暂无场景，请从剧本提取</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ResourcePanel
+        :resource-panel-collapsed="resourcePanelCollapsed"
+        :characters-block-collapsed="charactersBlockCollapsed"
+        :props-block-collapsed="propsBlockCollapsed"
+        :scenes-block-collapsed="scenesBlockCollapsed"
+        :characters="characters"
+        :props-list="props"
+        :scenes-list="scenes"
+        :generating-char-ids="generatingCharIds"
+        :generating-scene-ids="generatingSceneIds"
+        :generating-prop-ids="generatingPropIds"
+        :drama-id="dramaId"
+        :current-episode-id="currentEpisodeId"
+        :characters-generating="charactersGenerating"
+        :props-extracting="propsExtracting"
+        :scenes-extracting="scenesExtracting"
+        :uploading-resource-id="uploadingResourceId"
+        :drag-over-resource-key="dragOverResourceKey"
+        :adding-char-to-library-id="addingCharToLibraryId"
+        :adding-char-to-material-id="addingCharToMaterialId"
+        :sd2-certifying-id="sd2CertifyingId"
+        :adding-prop-to-library-id="addingPropToLibraryId"
+        :adding-prop-to-material-id="addingPropToMaterialId"
+        :adding-scene-to-library-id="addingSceneToLibraryId"
+        :adding-scene-to-material-id="addingSceneToMaterialId"
+        :regen-sb-images-for-asset="regenSbImagesForAsset"
+        :regen-sb-images-progress="regenSbImagesProgress"
+        :is-char-in-library="isCharInLibrary"
+        :is-char-in-material-library="isCharInMaterialLibrary"
+        :is-prop-in-library="isPropInLibrary"
+        :is-prop-in-material-library="isPropInMaterialLibrary"
+        :is-scene-in-library="isSceneInLibrary"
+        :is-scene-in-material-library="isSceneInMaterialLibrary"
+        :get-char-affected-storyboards="getCharAffectedStoryboards"
+        :get-scene-affected-storyboards="getSceneAffectedStoryboards"
+        :char-sd2-tag-text="charSd2TagText"
+        :parse-extra-images="parseExtraImages"
+        @toggle:resource-panel="resourcePanelCollapsed = !resourcePanelCollapsed"
+        @toggle:characters-block="charactersBlockCollapsed = !charactersBlockCollapsed"
+        @toggle:props-block="propsBlockCollapsed = !propsBlockCollapsed"
+        @toggle:scenes-block="scenesBlockCollapsed = !scenesBlockCollapsed"
+        @extract:characters="onGenerateCharacters"
+        @add:character="showEditCharacter = true; editCharacterForm = { name: '', role: 'main', description: '', personality: '', appearance: '', negative_prompt: '' }"
+        @library:character="showCharLibrary = true"
+        @edit:character="c => { editCharacterForm = { ...c }; showEditCharacter = true }"
+        @delete:character="c => onConfirmDeleteCharacter(c.id)"
+        @generate-image:character="c => onGenerateCharacterImage(c)"
+        @add-to-library:character="c => onAddCharToLibrary(c)"
+        @add-to-material-library:character="c => onAddCharToMaterialLibrary(c)"
+        @certify-sd2:character="c => onCertifySd2(c)"
+        @regen-storyboards:character="c => onRegenAffectedSbImages(c.id, 'character')"
+        @drag-over:character="e => onResourceDragOver(e, 'character')"
+        @drag-leave:character="onResourceDragLeave"
+        @drop:character="(c, e) => onResourceDrop(e, 'character', c)"
+        @upload-click:character="c => onUploadResourceClick('character', c.id)"
+        @extract:props="onExtractProps"
+        @add:prop="showAddProp = true"
+        @library:prop="showPropLibrary = true"
+        @edit:prop="p => { editPropForm = { ...p }; showEditProp = true }"
+        @delete:prop="p => onConfirmDeleteProp(p.id)"
+        @generate-image:prop="p => onGeneratePropImage(p)"
+        @add-to-library:prop="p => onAddPropToLibrary(p)"
+        @add-to-material-library:prop="p => onAddPropToMaterialLibrary(p)"
+        @drag-over:prop="e => onResourceDragOver(e, 'prop')"
+        @drag-leave:prop="onResourceDragLeave"
+        @drop:prop="(p, e) => onResourceDrop(e, 'prop', p)"
+        @upload-click:prop="p => onUploadResourceClick('prop', p.id)"
+        @extract:scenes="onExtractScenes"
+        @add:scene="showEditScene = true; editSceneForm = { location: '', time: '', description: '', prompt: '', negative_prompt: '' }"
+        @library:scene="showSceneLibrary = true"
+        @edit:scene="s => { editSceneForm = { ...s }; showEditScene = true }"
+        @delete:scene="s => onConfirmDeleteScene(s.id)"
+        @generate-image:scene="s => onGenerateSceneImage(s)"
+        @add-to-library:scene="s => onAddSceneToLibrary(s)"
+        @add-to-material-library:scene="s => onAddSceneToMaterialLibrary(s)"
+        @regen-storyboards:scene="s => onRegenAffectedSbImages(s.id, 'scene')"
+        @drag-over:scene="e => onResourceDragOver(e, 'scene')"
+        @drag-leave:scene="onResourceDragLeave"
+        @drop:scene="(s, e) => onResourceDrop(e, 'scene', s)"
+        @upload-click:scene="s => onUploadResourceClick('scene', s.id)"
+        @preview-image="openImagePreview"
+        @set-primary-image="onSetPrimaryImage"
+        @remove-extra-image="onRemoveExtraImage"
+      />
 
       <!-- 6. 分镜生成 -->
-      <section id="anchor-storyboard" class="section card">
-        <h2 class="section-title">
-          <span>5. 分镜生成</span>
-          <span class="step-desc">根据剧本、角色、场景自动生成分镜头脚本（分镜数量、时长、序列图与全能/解说选项见上方「本集配置」）</span>
-        </h2>
-        <div
-          v-if="storyboards.length > 0"
-          class="sb-config-row sb-narration-export-row"
-          style="margin-top:0;margin-bottom:12px;flex-wrap:wrap;align-items:center;gap:12px"
-        >
-          <el-button
-            class="sb-export-srt-btn"
-            size="small"
-            plain
-            type="primary"
-            :disabled="!currentEpisodeId"
-            @click="onExportNarrationSrt"
-          >
-            导出解说 SRT
-          </el-button>
-        </div>
-        <div class="asset-actions sb-batch-actions">
-          <div class="flex">
-            <el-button
-              type="primary"
-              size="large"
-              :loading="storyboardGenerating || universalOmniPolishRunning"
-              :disabled="!currentEpisodeId || storyboardGenerating || universalOmniPolishRunning"
-              @click="onGenerateStoryboard"
-            >
-              {{ storyboards.length > 0 ? '重新生成分镜' : 'AI 生成分镜' }}
-            </el-button>
-            <ElButton type="info" plain size="large" @click="onAddSingleStoryboard">
-            添加一个分镜
-            </ElButton>
-          </div>
-          <template v-if="storyboards.length > 0">
-            <div class="sb-batch-right">
-              <el-button
-                type="success"
-                plain
-                size="large"
-                :loading="batchImageRunning"
-                :disabled="!currentEpisodeId || batchImageRunning || batchVideoRunning || pipelineRunning || storyboardGenerating || universalOmniPolishRunning"
-                @click="startBatchImageGeneration"
-              >
-                批量生成分镜图
-              </el-button>
-              <el-button
-                type="warning"
-                plain
-                size="large"
-                :loading="batchVideoRunning"
-                :disabled="!currentEpisodeId || batchImageRunning || batchVideoRunning || pipelineRunning || storyboardGenerating || universalOmniPolishRunning"
-                @click="startBatchVideoGeneration"
-              >
-                批量生成分镜视频
-              </el-button>
-              <el-button v-if="batchImageRunning" size="large" type="danger" plain @click="batchImageStopping = true">停止图片</el-button>
-              <el-button v-if="batchVideoRunning" size="large" type="danger" plain @click="batchVideoStopping = true">停止视频</el-button>
-            </div>
-            <div class="batch-video-options" style="margin-top:8px;display:flex;align-items:center;gap:8px;font-size:13px;">
-              <el-checkbox v-model="videoFrameContiguity" size="small">
-                连贯帧模式（自动衔接相邻视频帧）
-              </el-checkbox>
-              <el-tooltip placement="top" :show-after="100">
-                <template #content>
-                  <div style="max-width:320px;line-height:1.7">
-                    <div style="font-weight:600;margin-bottom:4px">连贯帧模式说明</div>
-                    <div>启用后批量视频顺序生成，每条视频的<b>末帧</b>自动截取并作为下一条视频的<b>首帧参考图</b>，减少镜头切换的跳跃感。</div>
-                    <div style="margin-top:8px;font-weight:600">⚠️ 需要模型支持图生视频（i2v）</div>
-                    <div style="margin-top:4px">
-                      ✅ 支持：kling-video、kling-omni-video、wan2.2-kf2v-flash、wan2.6-i2v-flash<br/>
-                      ❌ 不支持（末帧将被忽略）：wan2.6-t2v、wan2.6-r2v-flash、wanx2.1-vace-plus 等纯文生视频模型
-                    </div>
-                    <div style="margin-top:8px;color:#faad14">如当前视频模型不支持 i2v，启用此选项不会报错，但末帧衔接不会生效。</div>
-                  </div>
-                </template>
-                <el-icon style="color:#9ca3af;cursor:help"><QuestionFilled /></el-icon>
-              </el-tooltip>
-            </div>
-          </template>
-        </div>
-        <!-- 批量生成进度 -->
-        <div v-if="batchImageRunning || batchVideoRunning || batchImageErrors.length || batchVideoErrors.length" class="batch-status">
-          <div v-if="batchImageRunning" class="batch-progress">
-            <el-icon class="is-loading"><Loading /></el-icon>
-            <span>批量生成分镜图：{{ batchImageProgress.current }}/{{ batchImageProgress.total }}</span>
-            <span v-if="batchImageProgress.failed > 0" class="batch-failed">{{ batchImageProgress.failed }} 条失败</span>
-            <span v-if="batchImageStopping" class="batch-stopping">（正在停止...）</span>
-          </div>
-          <div v-if="batchVideoRunning" class="batch-progress">
-            <el-icon class="is-loading"><Loading /></el-icon>
-            <span>批量生成分镜视频：{{ batchVideoProgress.current }}/{{ batchVideoProgress.total }}</span>
-            <span v-if="batchVideoProgress.failed > 0" class="batch-failed">{{ batchVideoProgress.failed }} 条失败</span>
-            <span v-if="batchVideoStopping" class="batch-stopping">（正在停止...）</span>
-          </div>
-          <div v-if="batchImageErrors.length > 0" class="batch-error-log">
-            <div class="batch-error-title">分镜图生成失败记录：</div>
-            <div v-for="(e, i) in batchImageErrors" :key="i" class="batch-error-line">{{ e }}</div>
-          </div>
-          <div v-if="batchVideoErrors.length > 0" class="batch-error-log">
-            <div class="batch-error-title">分镜视频生成失败记录：</div>
-            <div v-for="(e, i) in batchVideoErrors" :key="i" class="batch-error-line">{{ e }}</div>
-          </div>
-        </div>
-        <div v-if="storyboardGenerating || universalOmniPolishRunning" class="storyboard-generating-tip">
-          <el-icon class="is-loading"><Loading /></el-icon>
-          <span v-if="universalOmniPolishRunning">
-            正在润色全能提示词：第 {{ universalOmniPolishProgress.current }} / {{ universalOmniPolishProgress.total }} 镜
-            <template v-if="universalOmniPolishProgress.label">（{{ universalOmniPolishProgress.label }}）</template>
-            …
-          </span>
-          <span v-else>正在分析剧本并拆解分镜，请稍候...</span>
-        </div>
-        <div v-if="sbTruncatedWarning && !sbTruncatedDismissed && storyboards.length > 0" class="sb-truncated-warning">
-          <el-icon><WarningFilled /></el-icon>
-          <span>检测到分镜可能不完整（AI 输出被截断），请确认分镜数量是否符合预期，必要时可重新生成。</span>
-          <el-button size="small" text @click="sbTruncatedDismissed = true">关闭</el-button>
-        </div>
-        <template v-if="storyboards.length > 0">
-          <template v-for="(sb, i) in storyboards" :key="sb.id">
-            <!-- 段落分隔标头：segment_title 存在且是新段落的第一个镜头时显示 -->
-            <div
-              v-if="sb.segment_title && (i === 0 || sb.segment_index !== storyboards[i - 1].segment_index)"
-              class="segment-header"
-            >
-              <div class="segment-header-inner">
-                <span class="segment-index-badge">第 {{ (sb.segment_index ?? 0) + 1 }} 幕</span>
-                <span class="segment-title-text">{{ sb.segment_title }}</span>
-                <span class="segment-shot-range">
-                  镜头 {{ i + 1 }}–{{ (() => {
-                    let end = i
-                    while (end + 1 < storyboards.length && storyboards[end + 1].segment_index === sb.segment_index) end++
-                    return end + 1
-                  })() }}
-                </span>
-              </div>
-            </div>
-          <!-- 分镜控制栏（卡片外，缩进表示属于当前幕） -->
-          <div class="sb-ctrl-bar">
-            <span class="sb-ctrl-num">{{ i + 1 }}</span>
-            <span class="sb-ctrl-title">{{ sb.title || '未命名分镜' }}</span>
-            <el-button size="small" plain class="sb-ctrl-btn sb-ctrl-config-btn" @click="onOpenVideoParamsDialog(sb)">⚙ 分镜配置</el-button>
-            <el-button
-              size="small"
-              plain
-              class="sb-ctrl-btn sb-ctrl-mode-btn"
-              :title="isSbUniversalMode(sb.id) ? '切换为经典分镜（中间显示参考图）' : '切换为全能模式（中间为片段描述，经典字段保留）'"
-              @click="onToggleSbUniversalMode(sb)"
-            >
-              {{ isSbUniversalMode(sb.id) ? '经典分镜' : '全能模式' }}
-            </el-button>
-            <el-button size="small" plain class="sb-ctrl-btn" title="在本镜头前增加一个分镜" @click="onInsertStoryboardBefore(sb)">＋ 新增</el-button>
-            <el-button
-              class="sb-ctrl-delete"
-              type="danger"
-              text
-              size="small"
-              :title="`删除分镜${i + 1}`"
-              @click="onDeleteSingleStoryboard(sb.id)"
-            >
-              <el-icon><Delete /></el-icon>
-            </el-button>
-          </div>
-          <div :id="'sb-' + sb.id" class="storyboard-row">
-            <!-- 左：分镜脚本 -->
-            <div class="sb-panel sb-script">
-              <div class="sb-script-row sb-script-selects">
-                <el-select
-                  :model-value="getSbCharacterIds(sb.id)"
-                  placeholder="选择角色"
-                  multiple
-                  collapse-tags
-                  collapse-tags-tooltip
-                  size="small"
-                  class="sb-select"
-                  @update:model-value="(v) => setSbCharacterIds(sb.id, v)"
-                >
-                  <el-option
-                    v-for="c in (characters || [])"
-                    :key="String(c.id)"
-                    :label="c.name || '未命名'"
-                    :value="c.id"
-                  />
-                  <template v-if="!(characters || []).length" #empty>
-                    <span class="sb-select-empty">请先在「角色生成」中添加角色</span>
-                  </template>
-                </el-select>
-                <el-select
-                  v-model="sbSceneId[sb.id]"
-                  placeholder="选择场景"
-                  clearable
-                  size="small"
-                  class="sb-select"
-                  @change="() => onStoryboardSceneChange(sb.id)"
-                >
-                  <el-option
-                    v-for="s in (scenes || [])"
-                    :key="s.id"
-                    :label="s.location"
-                    :value="s.id"
-                  />
-                </el-select>
-                <el-select
-                  :model-value="getSbPropIds(sb.id)"
-                  placeholder="选择物品"
-                  multiple
-                  collapse-tags
-                  collapse-tags-tooltip
-                  size="small"
-                  class="sb-select"
-                  @update:model-value="(v) => setSbPropIds(sb.id, v)"
-                >
-                  <el-option
-                    v-for="p in (props || [])"
-                    :key="String(p.id)"
-                    :label="p.name || '未命名'"
-                    :value="p.id"
-                  />
-                  <template v-if="!(props || []).length" #empty>
-                    <span class="sb-select-empty">请先在「道具生成」中添加物品</span>
-                  </template>
-                </el-select>
-              </div>
-              <!-- 当前选中：场景 / 角色 / 物品缩略图 -->
-              <div v-if="getSbSelectedScene(sb.id) || getSbSelectedCharacters(sb.id).length || getSbSelectedProps(sb.id).length || (characters || []).length" class="sb-selected-thumbs">
-                <div v-if="getSbSelectedScene(sb.id)" class="sb-thumb-row">
-                  <span class="sb-thumb-label">场景</span>
-                  <div class="sb-thumb-list">
-                    <div
-                      v-for="s in [getSbSelectedScene(sb.id)]"
-                      :key="s.id"
-                      class="sb-thumb-item sb-thumb-scene"
-                      :class="{ 'sb-thumb-clickable': hasAssetImage(s) }"
-                      :title="s.location"
-                      role="button"
-                      @click="hasAssetImage(s) && openImagePreview(assetImageUrl(s))"
-                    >
-                      <img v-if="hasAssetImage(s)" :src="assetImageUrl(s)" alt="" />
-                      <span v-else class="sb-thumb-placeholder">{{ (s.location || '')[0] }}</span>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="(characters || []).length" class="sb-thumb-row">
-                  <span class="sb-thumb-label">角色</span>
-                  <div class="sb-thumb-list">
-                    <div
-                      v-for="c in getSbSelectedCharacters(sb.id)"
-                      :key="c.id"
-                      class="sb-thumb-item sb-thumb-avatar"
-                      :class="{ 'sb-thumb-clickable': hasAssetImage(c) }"
-                      :title="c.name"
-                      role="button"
-                      @click="hasAssetImage(c) && openImagePreview(assetImageUrl(c))"
-                    >
-                      <img v-if="hasAssetImage(c)" :src="assetImageUrl(c)" alt="" />
-                      <span v-else class="sb-thumb-placeholder">{{ (c.name || '')[0] }}</span>
-                    </div>
-                    <el-dropdown trigger="click" @command="(cmd) => onSbAddCharacterCommand(sb.id, cmd)">
-                      <div
-                        class="sb-thumb-item sb-thumb-avatar sb-thumb-add-char"
-                        title="添加角色"
-                        role="button"
-                        @click.stop
-                      >
-                        <el-icon><Plus /></el-icon>
-                      </div>
-                      <template #dropdown>
-                        <el-dropdown-menu class="sb-char-add-dropdown">
-                          <el-dropdown-item
-                            v-for="c in charactersAvailableToAddToSb(sb.id)"
-                            :key="c.id"
-                            :command="c.id"
-                          >
-                            {{ c.name || '未命名' }}
-                          </el-dropdown-item>
-                          <el-dropdown-item v-if="!charactersAvailableToAddToSb(sb.id).length" disabled>
-                            已全部添加或无角色
-                          </el-dropdown-item>
-                        </el-dropdown-menu>
-                      </template>
-                    </el-dropdown>
-                  </div>
-                </div>
-                <div v-if="getSbSelectedProps(sb.id).length" class="sb-thumb-row">
-                  <span class="sb-thumb-label">物品</span>
-                  <div class="sb-thumb-list">
-                    <div
-                      v-for="p in getSbSelectedProps(sb.id)"
-                      :key="p.id"
-                      class="sb-thumb-item sb-thumb-prop"
-                      :class="{ 'sb-thumb-clickable': hasAssetImage(p) }"
-                      :title="p.name"
-                      role="button"
-                      @click="hasAssetImage(p) && openImagePreview(assetImageUrl(p))"
-                    >
-                      <img v-if="hasAssetImage(p)" :src="assetImageUrl(p)" alt="" />
-                      <span v-else class="sb-thumb-placeholder">{{ (p.name || '')[0] }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="sb-prompt-label">
-                <span class="sb-dot"></span>
-                <span>图片提示词</span>
-              </div>
-              <div class="sb-prompt-row">
-                <span class="sb-prompt-text">{{ sb.image_prompt || '暂无图片提示词' }}</span>
-                <el-button size="small" link type="primary" @click="onOpenSbPromptDialog(sb)">编辑</el-button>
-              </div>
-              <template v-if="storyboardIncludeNarration || (sbNarration[sb.id] || '').trim() || (sb.narration || '').trim()">
-                <div class="sb-prompt-label">
-                  <span class="sb-dot"></span>
-                  <span>解说旁白</span>
-                </div>
-                <el-input
-                  v-model="sbNarration[sb.id]"
-                  type="textarea"
-                  :rows="2"
-                  placeholder="本镜解说文案（画外音 / 纪录片式旁白，供 TTS 或导出 SRT）"
-                  class="sb-narration-input"
-                  @blur="() => onSaveSbNarrationField(sb)"
-                />
-                <div v-if="(sbNarration[sb.id] || sb.narration || '').toString().trim()" class="sb-narration-actions">
-                  <el-tooltip content="解说旁白配音（TTS）" placement="top">
-                    <el-button size="small" :loading="ttsSbNarrationIds.has(sb.id)" @click="onTtsSbNarration(sb)">
-                      解说配音
-                    </el-button>
-                  </el-tooltip>
-                  <el-tooltip v-if="sbNarrationAudioRelPath(sb)" content="播放解说旁白配音" placement="top">
-                    <el-button size="small" @click="playSbNarrationTts(sb)">
-                      <el-icon><VideoPlay /></el-icon>
-                    </el-button>
-                  </el-tooltip>
-                </div>
-              </template>
-            </div>
-            <!-- 中：经典模式=分镜参考图；全能模式=片段描述（独立字段，与参考图并存） -->
-            <div class="sb-panel sb-image" :class="{ 'sb-image--universal': isSbUniversalMode(sb.id) }">
-              <template v-if="isSbUniversalMode(sb.id)">
-                <div class="sb-prompt-label sb-universal-label-row">
-                  <div class="sb-universal-label-left">
-                    <span class="sb-dot"></span>
-                    <span>全能模式片段描述</span>
-                    <el-tooltip placement="top" :show-after="280" :show-arrow="false" popper-class="sb-universal-tooltip-popper">
-                      <template #content>
-                        <div class="sb-universal-tooltip">
-                          全能生视频链路（<strong>AI 配置 · 视频</strong> 中选接口规范：<code>kling_omni</code> 可灵 Omni，或 <code>volcengine_omni</code> 火山即梦 Seedance 2.0 多图参考；模型如 <code>kling-video-o1</code>、<code>doubao-seedance-2-0-260128</code> 等以控制台为准）：此处为提交主提示词；只要本框有内容，生视频时<strong>只</strong>发送这段，不会拼接下方「视频提示词」里的动作/对话/旁白。参考图顺序一般为：场景 → 角色（多张）→ 物品（<strong>不含</strong>经典分镜中间主图）；请用 <strong>@图片1</strong>、<strong>@图片2</strong>…（<strong>@图片N 后建议加半角空格</strong>）对应参考图，勿用 @姓名 指图；有场景图时 <strong>@图片1</strong> 只表环境，人物从 <strong>@图片2</strong> 起。若场景参考是<strong>四宫格/多视角拼图</strong>，仅借空间与氛围，须在文案中写明<strong>单镜头完整画幅、禁止分屏宫格</strong>，避免成片模仿拼图布局。全能提示词下拉中「生成」会按<strong>本条分镜总时长</strong>与本集剧本、镜序、邻镜信息，自动决定子分镜数 M（第2行「由以下M个分镜…」），第4行起为「分镜1：T1秒:」…多行，且各段秒数之和等于本镜时长；第3行仍为环境/参考图约束；「生成」与「润色」均为<strong>流式输出</strong>到本框；「润色」在此基础上增强。若本框留空，则退回仅用「视频提示词」。
-                        </div>
-                      </template>
-                      <el-icon class="sb-universal-hint-icon" tabindex="0" role="img" aria-label="片段说明">
-                        <QuestionFilled />
-                      </el-icon>
-                    </el-tooltip>
-                  </div>
-                  <el-dropdown
-                    trigger="click"
-                    class="sb-universal-prompt-dd"
-                    @command="(cmd) => onUniversalSegmentPromptMenu(sb, cmd)"
-                  >
-                    <el-button
-                      type="primary"
-                      link
-                      size="small"
-                      class="sb-universal-gen-btn"
-                      :loading="generatingUniversalSegmentIds.has(sb.id)"
-                    >
-                      全能提示词
-                      <el-icon class="sb-universal-dd-caret"><ArrowDown /></el-icon>
-                    </el-button>
-                    <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item command="generate">生成全能提示词</el-dropdown-item>
-                        <el-dropdown-item command="generate-force">不查图片强制生成</el-dropdown-item>
-                        <el-dropdown-item command="polish" :disabled="!sbUniversalSegmentTrimmed(sb)">
-                          润色全能提示词
-                        </el-dropdown-item>
-                        <el-dropdown-item command="polish-force" :disabled="!sbUniversalSegmentTrimmed(sb)">
-                          不查图片强制润色
-                        </el-dropdown-item>
-                        <el-dropdown-item
-                          command="to-grok-video-tags"
-                          divided
-                          :disabled="!sbUniversalSegmentTrimmed(sb)"
-                        >
-                          改为 grok视频格式
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                </div>
-                <UniversalSegmentOmniAtEditor
-                  v-if="!generatingUniversalSegmentIds.has(sb.id)"
-                  v-model="sbUniversalSegmentText[sb.id]"
-                  :slots="getSbUniversalOmniRefSlots(sb)"
-                  class="sb-universal-textarea"
-                  @blur="() => onSaveUniversalSegmentField(sb)"
-                />
-                <el-input
-                  v-else
-                  v-model="sbUniversalSegmentText[sb.id]"
-                  type="textarea"
-                  :rows="10"
-                  :autosize="{ minRows: 10, maxRows: 22 }"
-                  placeholder="例如：@图片1 为夜景街道，@图片2 从餐厅冲出停在光斑里，低头操作手机…"
-                  class="sb-universal-textarea"
-                  @blur="() => onSaveUniversalSegmentField(sb)"
-                />
-              </template>
-              <template v-else>
-              <div
-                class="sb-image-area"
-                :class="{ 'sb-image-area--dragover': dragOverSbId === sb.id, 'sb-image-area--has-quad': getStripItems(sb.id).length > 0 }"
-                @dragover="onSbImageDragOver($event, sb.id)"
-                @dragleave="onSbImageDragLeave($event, sb.id)"
-                @drop="onSbImageDrop($event, sb)"
-              >
-                <!-- 主图区：最新选中/默认图 > legacy composed_image > 错误 > 空 -->
-                <div class="sb-main-image-wrap">
-                  <template v-if="getSbImage(sb.id)">
-                    <img
-                      :src="assetImageUrl(getSbImage(sb.id))"
-                      class="sb-generated-img"
-                      alt=""
-                      :title="getSbImage(sb.id).prompt || ''"
-                      @click="openImagePreview(assetImageUrl(getSbImage(sb.id)))"
-                    />
-                    <div v-if="getSbImage(sb.id).prompt" class="sb-main-img-prompt">{{ getSbImage(sb.id).prompt }}</div>
-                  </template>
-                  <template v-else-if="sb.composed_image || sb.image_url">
-                    <img
-                      :src="imageUrl(sb.composed_image || sb.image_url)"
-                      class="sb-generated-img"
-                      alt=""
-                      @click="openImagePreview(imageUrl(sb.composed_image || sb.image_url))"
-                    />
-                  </template>
-                  <template v-else-if="sb.error_msg || sb.errorMsg">
-                    <div class="sb-image-error" :title="sb.error_msg || sb.errorMsg">{{ sb.error_msg || sb.errorMsg }}</div>
-                    <el-button type="primary" size="small" class="sb-gen-btn" :loading="generatingSbImageIds.has(sb.id)" @click="onGenerateSbImage(sb)">
-                      <el-icon><Refresh /></el-icon>
-                      重试
-                    </el-button>
-                    <el-button size="small" :loading="uploadingSbImageId === sb.id" @click="onUploadSbImageClick(sb)">上传</el-button>
-                  </template>
-                  <template v-else>
-                    <el-button type="primary" size="small" class="sb-gen-btn" :loading="generatingSbImageIds.has(sb.id)" @click="onGenerateSbImage(sb)">
-                      <el-icon><MagicStick /></el-icon>
-                      生成分镜参考图
-                    </el-button>
-                    <el-button size="small" :loading="uploadingSbImageId === sb.id" @click="onUploadSbImageClick(sb)">上传</el-button>
-                  </template>
-                </div>
+      <StoryboardSection
+        :storyboards="storyboards"
+        :sb-images="sbImages"
+        :sb-videos="sbVideos"
+        :storyboard-generating="storyboardGenerating"
+        :batch-image-running="batchImageRunning"
+        :batch-video-running="batchVideoRunning"
+        :batch-image-stopping="batchImageStopping"
+        :batch-video-stopping="batchVideoStopping"
+        :batch-image-progress="batchImageProgress"
+        :batch-video-progress="batchVideoProgress"
+        :batch-image-errors="batchImageErrors"
+        :batch-video-errors="batchVideoErrors"
+        :video-frame-contiguity="videoFrameContiguity"
+        :drama-id="dramaId"
+        :current-episode-id="currentEpisodeId"
+        :characters="characters"
+        :scenes="scenes"
+        :props-list="props"
+        :generating-sb-image-ids="generatingSbImageIds"
+        :generating-sb-video-ids="generatingSbVideoIds"
+        :generating-universal-segment-ids="generatingUniversalSegmentIds"
+        :is-dark="isDark"
+        @generate:storyboard="onGenerateStoryboard"
+        @add:storyboard="onAddSingleStoryboard"
+        @delete:storyboard="sb => onDeleteSingleStoryboard(sb)"
+        @insert:storyboard="sb => onInsertStoryboardBefore(sb)"
+        @generate:sb-image="sb => onGenerateSbImage(sb)"
+        @generate:sb-video="sb => onGenerateSbVideo(sb)"
+        @upload:sb-image="sb => onUploadSbImageClick(sb)"
+        @upscale:sb-image="sb => onUpscaleSbImage(sb)"
+        @start:batch-image="startBatchImageGeneration"
+        @stop:batch-image="batchImageStopping = true"
+        @start:batch-video="startBatchVideoGeneration"
+        @stop:batch-video="batchVideoStopping = true"
+        @update:frame-contiguity="v => videoFrameContiguity = v"
+        @select:sb-character="(sbId, ids) => setSbCharacterIds(sbId, ids)"
+        @select:sb-scene="(sbId, id) => onStoryboardSceneChange(sbId, id)"
+        @select:sb-prop="(sbId, ids) => onStoryboardPropChange(sbId, ids)"
+        @tts:dialogue="sb => onTtsSbDialogue(sb)"
+        @tts:narration="sb => onTtsSbNarration(sb)"
+        @open:prompt-dialog="sb => onOpenSbPromptDialog(sb)"
+        @open:video-params-dialog="sb => onOpenVideoParamsDialog(sb)"
+        @edit:sb-image-prompt="sb => onEditSbImagePrompt(sb)"
+        @edit:sb-video-prompt="sb => onEditSbVideoPrompt(sb)"
+        @play:tts-dialogue="sb => playSbDialogueTts(sb)"
+        @play:tts-narration="sb => playSbNarrationTts(sb)"
+        @select:sb-main-image="(sbId, imgId) => onSelectSbMainImage(sbId, imgId)"
+        @select:sb-main-video="(sbId, vidId) => onSelectSbMainVideo(sbId, vidId)"
+        @drag-over:sb="e => {}"
+        @drag-leave:sb="() => {}"
+        @drop:sb="(sb, e) => {}"
+        @toggle:universal-mode="sb => onToggleSbUniversalMode(sb)"
+        @save:universal-segment="args => onSaveUniversalSegmentField(args)"
+        @generate:universal-segment-prompt="sb => onGenerateUniversalSegmentPrompt(sb)"
+        @polish:universal-segment-prompt="sb => onPolishUniversalSegmentPromptStream(sb)"
+        @polish:classic-video-prompt="sb => onPolishClassicVideoPromptStream(sb)"
+        @export:narration-srt="onExportNarrationSrt"
+        @open-image-preview="url => openImagePreview(url)"
+      />
 
-                <!-- ② 统一缩略图条：未选中的面板 + 其他已生成图（点击切换主图，不触发上传） -->
-                <div v-if="getStripItems(sb.id).length" class="sb-imgs-strip">
-                  <el-tooltip content="历史图：点击缩略图可设为主图" placement="top" :show-arrow="false">
-                    <el-icon class="sb-strip-hint-icon"><InfoFilled /></el-icon>
-                  </el-tooltip>
-                  <div
-                    v-for="item in getStripItems(sb.id)"
-                    :key="item.key"
-                    class="sb-img-thumb"
-                    :title="[item.label, item.prompt].filter(Boolean).join('\n\n') || '点击设为主图'"
-                    @click="onSelectStripItem(sb, item)"
-                  >
-                    <img :src="item.src" alt="" />
-                    <span v-if="item.label" class="sb-img-thumb-label">{{ item.label }}</span>
-                  </div>
-                </div>
-
-                <div v-if="dragOverSbId === sb.id" class="sb-image-area-drop-hint">松开上传</div>
-              </div>
-              <div v-if="hasSbImage(sb)" class="sb-image-actions">
-                <el-button size="small" :loading="generatingSbImageIds.has(sb.id)" @click="onGenerateSbImage(sb)">重新生成</el-button>
-                <el-button
-                  v-if="!isSbUniversalMode(sb.id)"
-                  size="small"
-                  type="success"
-                  plain
-                  :loading="classicVideoPolishIds.has(sb.id)"
-                  :disabled="generatingSbVideoIds.has(sb.id)"
-                  @click="onPolishClassicVideoPromptStream(sb)"
-                >润色分镜视频提示词</el-button>
-                <el-button size="small" :loading="uploadingSbImageId === sb.id" @click="onUploadSbImageClick(sb)">上传</el-button>
-                <el-tooltip content="高清放大（2x超分辨率）" placement="top">
-                  <el-button
-                    size="small"
-                    :loading="upscalingSbIds.has(sb.id)"
-                    :disabled="!getSbLocalImage(sb)"
-                    @click="onUpscaleSbImage(sb)"
-                  >
-                    <el-icon><ZoomIn /></el-icon>超分
-                  </el-button>
-                </el-tooltip>
-              </div>
-              </template>
-            </div>
-            <!-- 右：分镜视频（由 /videos?storyboard_id 拉取）；有视频时仍显示提示词与生成按钮便于调整后重新生成 -->
-            <div class="sb-panel sb-video">
-              <div v-if="getSbVideo(sb.id)" class="sb-video-area">
-                <video
-                  v-if="assetVideoUrl(getSbVideo(sb.id))"
-                  :key="sbMainVideoPlayerKey(sb.id)"
-                  :src="assetVideoUrl(getSbVideo(sb.id))"
-                  controls
-                  class="sb-video-player"
-                  preload="metadata"
-                />
-                <span v-if="generatingSbVideoIds.has(sb.id)" class="sb-video-regenerating-overlay">
-                  <el-icon class="is-loading"><Loading /></el-icon>
-                  正在重新生成...
-                </span>
-              </div>
-              <div v-else class="sb-video-area sb-video-placeholder">
-                <span v-if="generatingSbVideoIds.has(sb.id)" class="sb-video-generating-text">
-                  <el-icon class="is-loading"><Loading /></el-icon>
-                  正在生成视频...
-                </span>
-                <template v-else>
-                  <div v-if="getSbVideoError(sb.id)" class="sb-video-error">
-                    {{ getSbVideoError(sb.id) }}
-                  </div>
-                  <el-button
-                    type="primary"
-                    size="small"
-                    class="sb-generate-video-btn"
-                    :loading="generatingSbVideoIds.has(sb.id)"
-                    :disabled="!sbCanSubmitVideo(sb)"
-                    @click="onGenerateSbVideo(sb)"
-                  >
-                    生成分镜视频
-                  </el-button>
-                </template>
-              </div>
-              <!-- 视频历史条：有多条历史时显示，点击可切换 -->
-              <div v-if="getVideoStripItems(sb.id).length" class="sb-videos-strip">
-                <el-tooltip content="历史视频：点击可切换为当前视频" placement="top" :show-arrow="false">
-                  <el-icon class="sb-strip-hint-icon"><InfoFilled /></el-icon>
-                </el-tooltip>
-                <div
-                  v-for="item in getVideoStripItems(sb.id)"
-                  :key="item.key"
-                  class="sb-video-thumb"
-                  :title="`${item.label}（点击切换）`"
-                  @click="onSelectSbMainVideo(sb, item.video)"
-                >
-                  <video :src="item.src" preload="metadata" class="sb-video-thumb-player" />
-                  <span class="sb-video-thumb-label">{{ item.label }}</span>
-                </div>
-              </div>
-              <div v-if="getSbVideo(sb.id)" class="sb-video-actions">
-                <el-button size="small" :loading="generatingSbVideoIds.has(sb.id)" :disabled="!sbCanSubmitVideo(sb)" @click="onGenerateSbVideo(sb)">重新生成</el-button>
-                <el-tooltip v-if="sb.dialogue" content="对白配音（TTS）" placement="top">
-                  <el-button size="small" :loading="ttsSbIds.has(sb.id)" @click="onTtsSbDialogue(sb)">
-                    对白配音
-                  </el-button>
-                </el-tooltip>
-                <el-tooltip v-if="sb.dialogue && sbDialogueAudioRelPath(sb)" content="播放对白配音" placement="top">
-                  <el-button size="small" @click="playSbDialogueTts(sb)">
-                    <el-icon><VideoPlay /></el-icon>
-                  </el-button>
-                </el-tooltip>
-              </div>
-              <div class="sb-video-prompt-label">
-                <span class="sb-dot"></span>
-                <span>经典视频提示词</span>
-              </div>
-              <div class="sb-video-params-bar">
-                <span class="sb-video-prompt-text sb-video-prompt-text--preview">{{ sb.video_prompt || '暂无视频提示词' }}</span>
-                <el-button size="small" link type="primary" @click="onOpenSbPromptDialog(sb)">手工编辑</el-button>
-              </div>
-            </div>
-          </div>
-          </template>
-        </template>
-        <!-- 分镜生成中提示条 -->
-        <div v-if="storyboardGenerating || universalOmniPolishRunning" class="sb-generating-tip">
-          <span class="sb-gen-dot" /><span class="sb-gen-dot" /><span class="sb-gen-dot" />
-          <span v-if="universalOmniPolishRunning" class="sb-gen-text">
-            全能片段润色中 {{ universalOmniPolishProgress.current }}/{{ universalOmniPolishProgress.total }}
-            <template v-if="universalOmniPolishProgress.label"> · {{ universalOmniPolishProgress.label }}</template>
-          </span>
-          <span v-else class="sb-gen-text">分镜持续生成中，客官稍等片刻…</span>
-        </div>
-        <div v-else-if="storyboards.length === 0" class="empty-tip">请先生成分镜</div>
-      </section>
 
       <!-- 7. 视频配置 + AI 模型配置 -->
       <section class="section card">
@@ -1372,837 +520,204 @@
       </section>
     </main>
 
-    <!-- 添加道具弹窗 -->
-    <el-dialog v-model="showAddProp" title="添加道具" width="600px" @close="() => { addPropForm = { name: '', type: '', description: '', prompt: '' }; addPropAddRefImage = null }">
-      <el-form label-width="90px">
-        <el-form-item label="参考图">
-          <div class="ref-image-zone">
-            <div class="ref-image-box" @click="addPropAddRefFileInput?.click()" @drop.prevent="onRefImageDrop2('addProp', $event)" @dragover.prevent>
-              <img v-if="addPropAddRefImage" :src="addPropAddRefImage.dataUrl" class="ref-preview-img" />
-              <div v-else class="ref-upload-hint"><span class="ref-upload-icon">🖼</span><span>点击或拖入参考图</span></div>
-            </div>
-            <div v-if="addPropAddRefImage" class="ref-actions">
-              <el-button type="primary" size="small" :loading="extractingPropAddDesc" @click="doExtractFromRef2('addProp')">提取特征描述</el-button>
-              <el-button size="small" @click="addPropAddRefImage = null">移除</el-button>
-            </div>
-          </div>
-        </el-form-item>
-        <el-form-item label="名称" required>
-          <el-input v-model="addPropForm.name" placeholder="道具名称" />
-        </el-form-item>
-        <el-form-item label="类型">
-          <el-input v-model="addPropForm.type" placeholder="如：物品、建筑" />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="addPropForm.description" type="textarea" :rows="3" placeholder="描述" />
-        </el-form-item>
-        <el-form-item label="图生提示词">
-          <el-input v-model="addPropForm.prompt" type="textarea" :rows="2" placeholder="用于 AI 生成图片的提示词" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showAddProp = false">取消</el-button>
-        <el-button type="primary" :loading="addPropSaving" :disabled="!addPropForm.name.trim()" @click="submitAddProp">确定</el-button>
-      </template>
-    </el-dialog>
+    <!-- 资源编辑对话框 -->
+    <ResourceEditDialogs
+      :show-add-prop="showAddProp"
+      :add-prop-form="addPropForm"
+      :add-prop-saving="addPropSaving"
+      :add-prop-ref-image="addPropAddRefImage ? addPropAddRefImage.dataUrl : ''"
+      :add-prop-ref-image-extracting="extractingPropAddDesc"
+      :show-edit-character="showEditCharacter"
+      :edit-character-form="editCharacterForm"
+      :edit-character-saving="editCharacterSaving"
+      :edit-character-prompt-generating="editCharacterPromptGenerating"
+      :extracting-char-appearance="extractingCharAppearance"
+      :extracting-anchors="extractingAnchors"
+      :add-char-ref-image="addCharRefImage"
+      :show-char-sd2-cert="showCharSd2Cert"
+      :char-sd2-cert-payload="charSd2CertPayload"
+      :show-edit-prop="showEditProp"
+      :edit-prop-form="editPropForm"
+      :edit-prop-saving="editPropSaving"
+      :edit-prop-prompt-generating="editPropPromptGenerating"
+      :show-edit-scene="showEditScene"
+      :edit-scene-form="editSceneForm"
+      :edit-scene-saving="editSceneSaving"
+      :edit-scene-prompt-generating="editScenePromptGenerating"
+      @submit:add-prop="onSubmitAddProp"
+      @cancel:add-prop="showAddProp = false"
+      @extract:prop-add-desc="doExtractFromRef2('addProp')"
+      @clear:prop-add-ref="addPropAddRefImage = null"
+      @submit:edit-character="onSubmitEditCharacter"
+      @cancel:edit-character="showEditCharacter = false"
+      @generate:character-prompt="onGenerateCharacterPrompt"
+      @extract:char-appearance="onExtractCharAppearance"
+      @extract:char-anchors="onExtractAnchors"
+      @clear:char-ref-image="addCharRefImage = null"
+      @file-change:char-ref="onRefImageFileChange"
+      @close:sd2-cert="showCharSd2Cert = false"
+      @submit:edit-prop="onSubmitEditProp"
+      @cancel:edit-prop="showEditProp = false"
+      @generate:prop-prompt="onGeneratePropPrompt"
+      @submit:edit-scene="onSubmitEditScene"
+      @cancel:edit-scene="showEditScene = false"
+      @generate:scene-prompt="onGenerateScenePrompt"
+    />
 
-    <!-- 隐藏的文件输入框（放在弹窗外层，避免 el-form-item 干扰） -->
-    <input ref="addCharRefFileInput" type="file" accept="image/*" style="display:none" @change="onRefImageFileChange('character', $event)" />
-    <input ref="addSceneRefFileInput" type="file" accept="image/*" style="display:none" @change="onRefImageFileChange('scene', $event)" />
-    <input ref="addPropRefFileInput" type="file" accept="image/*" style="display:none" @change="onRefImageFileChange('prop', $event)" />
-    <input ref="addPropAddRefFileInput" type="file" accept="image/*" style="display:none" @change="onRefImageFileChange2('addProp', $event)" />
+    <!-- 素材库对话框 -->
+    <LibraryDialogs
+      :current-episode-id="currentEpisodeId"
+      :show-char-library="showCharLibrary"
+      :char-library-list="charLibraryList"
+      :char-library-loading="charLibraryLoading"
+      :char-library-page="charLibraryPage"
+      :char-library-page-size="charLibraryPageSize"
+      :char-library-total="charLibraryTotal"
+      :char-library-keyword="charLibraryKeyword"
+      :show-edit-char-library="showEditCharLibrary"
+      :edit-char-library-form="editCharLibraryForm"
+      :edit-char-library-saving="editCharLibrarySaving"
+      :edit-char-library-img-uploading="editCharLibraryImgUploading"
+      :edit-char-library-img-generating="editCharLibraryImgGenerating"
+      :show-prop-library="showPropLibrary"
+      :prop-library-list="propLibraryList"
+      :prop-library-loading="propLibraryLoading"
+      :prop-library-page="propLibraryPage"
+      :prop-library-page-size="propLibraryPageSize"
+      :prop-library-total="propLibraryTotal"
+      :prop-library-keyword="propLibraryKeyword"
+      :show-edit-prop-library="showEditPropLibrary"
+      :edit-prop-library-form="editPropLibraryForm"
+      :edit-prop-library-saving="editPropLibrarySaving"
+      :edit-prop-library-img-uploading="editPropLibraryImgUploading"
+      :edit-prop-library-img-generating="editPropLibraryImgGenerating"
+      :show-scene-library="showSceneLibrary"
+      :scene-library-list="sceneLibraryList"
+      :scene-library-loading="sceneLibraryLoading"
+      :scene-library-page="sceneLibraryPage"
+      :scene-library-page-size="sceneLibraryPageSize"
+      :scene-library-total="sceneLibraryTotal"
+      :scene-library-keyword="sceneLibraryKeyword"
+      :show-edit-scene-library="showEditSceneLibrary"
+      :edit-scene-library-form="editSceneLibraryForm"
+      :edit-scene-library-saving="editSceneLibrarySaving"
+      :edit-scene-library-img-uploading="editSceneLibraryImgUploading"
+      :edit-scene-library-img-generating="editSceneLibraryImgGenerating"
+      @load:char-library="loadCharLibraryList"
+      @search:char-library="debouncedLoadCharLibrary"
+      @open-edit:char-library="item => { editCharLibraryForm = { ...item }; showEditCharLibrary = true }"
+      @delete:char-library="item => onDeleteCharLibrary(item)"
+      @add-char-from-library="item => onAddCharFromLibrary(item)"
+      @submit:edit-char-library="onSubmitEditCharLibrary"
+      @cancel:edit-char-library="showEditCharLibrary = false"
+      @upload-img:char-library="e => onUploadLibImg(e, editCharLibraryForm, characterLibraryAPI, loadCharLibraryList)"
+      @generate-img:char-library="() => doGenerateLibImg(editCharLibraryForm, editCharLibraryForm.name, characterLibraryAPI, loadCharLibraryList)"
+      @file-change:char-library="e => onLibFileChange(e, 'char')"
+      @update:showCharLibrary="v => showCharLibrary = v"
+      @update:showEditCharLibrary="v => showEditCharLibrary = v"
+      @load:prop-library="loadPropLibraryList"
+      @search:prop-library="debouncedLoadPropLibrary"
+      @open-edit:prop-library="item => { editPropLibraryForm = { ...item }; showEditPropLibrary = true }"
+      @delete:prop-library="item => onDeletePropLibrary(item)"
+      @add-prop-from-library="item => onAddPropFromLibrary(item)"
+      @submit:edit-prop-library="onSubmitEditPropLibrary"
+      @cancel:edit-prop-library="showEditPropLibrary = false"
+      @upload-img:prop-library="e => onUploadLibImg(e, editPropLibraryForm, propLibraryAPI, loadPropLibraryList)"
+      @generate-img:prop-library="() => doGenerateLibImg(editPropLibraryForm, editPropLibraryForm.name, propLibraryAPI, loadPropLibraryList)"
+      @file-change:prop-library="e => onLibFileChange(e, 'prop')"
+      @update:showPropLibrary="v => showPropLibrary = v"
+      @update:showEditPropLibrary="v => showEditPropLibrary = v"
+      @load:scene-library="loadSceneLibraryList"
+      @search:scene-library="debouncedLoadSceneLibrary"
+      @open-edit:scene-library="item => { editSceneLibraryForm = { ...item }; showEditSceneLibrary = true }"
+      @delete:scene-library="item => onDeleteSceneLibrary(item)"
+      @add-scene-from-library="item => onAddSceneFromLibrary(item)"
+      @submit:edit-scene-library="onSubmitEditSceneLibrary"
+      @cancel:edit-scene-library="showEditSceneLibrary = false"
+      @upload-img:scene-library="e => onUploadLibImg(e, editSceneLibraryForm, sceneLibraryAPI, loadSceneLibraryList)"
+      @generate-img:scene-library="() => doGenerateLibImg(editSceneLibraryForm, editSceneLibraryForm.location || editSceneLibraryForm.description, sceneLibraryAPI, loadSceneLibraryList)"
+      @file-change:scene-library="e => onLibFileChange(e, 'scene')"
+      @update:showSceneLibrary="v => showSceneLibrary = v"
+      @update:showEditSceneLibrary="v => showEditSceneLibrary = v"
+    />
 
-    <!-- 添加/编辑角色弹窗 -->
-    <el-dialog v-model="showEditCharacter" :title="editCharacterForm?.id ? '编辑角色' : '添加角色'" width="75%" @close="onCloseCharDialog">
-      <el-form v-if="editCharacterForm" label-width="90px">
-        <!-- 参考图上传区（新增/编辑均显示） -->
-        <el-form-item label="参考图">
-          <div class="ref-image-zone">
-            <div class="ref-image-box" @click="addCharRefFileInput?.click()" @drop.prevent="onRefImageDrop('character', $event)" @dragover.prevent>
-              <!-- 优先：刚上传的新参考图 -->
-              <img v-if="addCharRefImage" :src="addCharRefImage.dataUrl" class="ref-preview-img" />
-              <!-- 次之：已保存的参考图 -->
-              <img v-else-if="editCharacterForm.ref_image"
-                :src="editCharacterForm.ref_image.startsWith('http') ? editCharacterForm.ref_image : '/static/' + editCharacterForm.ref_image"
-                class="ref-preview-img" />
-              <!-- 最后：主图（半透明，提示可上传参考图替代） -->
-              <img v-else-if="editCharacterForm.id && (editCharacterForm.image_url || editCharacterForm.local_path)"
-                :src="assetImageUrl(editCharacterForm)"
-                class="ref-preview-img" style="opacity:0.5" />
-              <div v-else class="ref-upload-hint"><span class="ref-upload-icon">🖼</span><span>点击或拖入参考图</span></div>
-            </div>
-            <div v-if="addCharRefImage" class="ref-actions">
-              <el-button type="primary" size="small" :loading="extractingCharAppearance" @click="doExtractFromRef('character')">提取特征描述</el-button>
-              <el-button size="small" @click="addCharRefImage = null">移除</el-button>
-            </div>
-            <div v-else-if="editCharacterForm.ref_image" class="ref-actions">
-              <el-button type="primary" size="small" :loading="extractingCharAppearance" @click="doExtractCharFromImage">从参考图提取描述</el-button>
-              <el-button size="small" @click="clearCharRefImage">移除参考图</el-button>
-            </div>
-            <div v-else-if="editCharacterForm.id && (editCharacterForm.image_url || editCharacterForm.local_path) && !editCharacterForm.appearance" class="ref-actions">
-              <el-button size="small" :loading="extractingCharAppearance" @click="doExtractCharFromImage">从主图提取描述</el-button>
-            </div>
-          </div>
-        </el-form-item>
-        <el-form-item label="名称" required>
-          <el-input v-model="editCharacterForm.name" placeholder="角色名称" />
-        </el-form-item>
-        <el-form-item label="身份/定位">
-          <el-select v-model="editCharacterForm.role" placeholder="请选择角色类型" style="width:200px">
-            <el-option value="main" label="主角" />
-            <el-option value="supporting" label="配角" />
-            <el-option value="minor" label="次要角色" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="外貌描述">
-          <el-input v-model="editCharacterForm.appearance" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }" placeholder="用于 AI 生成图像的外貌描述，尽量详细" />
-        </el-form-item>
-        <el-form-item label="简介">
-          <el-input v-model="editCharacterForm.description" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="角色背景简介，供剧本生成参考" />
-        </el-form-item>
-        <el-form-item v-if="editCharacterForm.id">
-          <template #label>
-            <span style="font-size:12px;line-height:1.4;white-space:normal;word-break:break-all;display:inline-block;width:90px">图生提示词</span>
-          </template>
-          <div style="width:100%">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-              <span style="font-size:12px;color:#909399">AI 润色后的最终提示词，生成四视图图片时直接使用；可手动修改</span>
-              <el-button
-                size="small"
-                :loading="editCharacterPromptGenerating"
-                @click="doGenerateCharacterPrompt"
-              >重新生成提示词</el-button>
-            </div>
-            <el-input
-              v-model="editCharacterForm.polished_prompt"
-              type="textarea"
-              :autosize="{ minRows: 5, maxRows: 16 }"
-              :placeholder="editCharacterPromptGenerating ? 'AI 正在生成提示词，请稍候…' : '点击「重新生成提示词」由 AI 自动生成，或直接在此输入'"
-              :disabled="editCharacterPromptGenerating"
-              style="font-size:12px"
-            />
-          </div>
-        </el-form-item>
-        <!-- P0-2: 视觉锚点（identity_anchors） -->
-        <el-form-item v-if="editCharacterForm.id" label="视觉锚点">
-          <div style="width:100%">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-              <span style="font-size:12px;color:#909399">AI 从外貌描述提炼的6层视觉特征，用于保持生成图片角色一致性</span>
-              <el-button
-                size="small"
-                :loading="extractingAnchors"
-                :disabled="!editCharacterForm.appearance"
-                @click="extractIdentityAnchors"
-              >提炼视觉锚点</el-button>
-            </div>
-            <el-input
-              v-if="editCharacterForm.identity_anchors"
-              :value="typeof editCharacterForm.identity_anchors === 'string'
-                ? editCharacterForm.identity_anchors
-                : JSON.stringify(editCharacterForm.identity_anchors, null, 2)"
-              type="textarea"
-              :rows="4"
-              readonly
-              style="font-size:11px;font-family:monospace"
-              placeholder="点击「提炼视觉锚点」生成"
-            />
-            <div v-else style="font-size:12px;color:#c0c4cc;padding:4px 0">暂无锚点，点击「提炼视觉锚点」自动提炼</div>
-          </div>
-        </el-form-item>
-        <!-- P1-3: 多阶段造型（stages） -->
-        <el-form-item v-if="editCharacterForm.id" label="多阶段造型">
-          <div style="width:100%">
-            <div style="font-size:12px;color:#909399;margin-bottom:6px">
-              不同集次的角色造型变化，格式：JSON 数组 [{"episode_range":[1,3],"appearance":"..."}]
-            </div>
-            <el-input
-              v-model="editCharacterForm.stages"
-              type="textarea"
-              :rows="4"
-              placeholder='例：[{"episode_range":[1,5],"appearance":"白衣少年"},{"episode_range":[6,10],"appearance":"黑衣武者"}]'
-              style="font-size:12px;font-family:monospace"
-            />
-          </div>
-        </el-form-item>
-        <el-form-item label="负面提示词">
-          <el-input
-            v-model="editCharacterForm.negative_prompt"
-            type="textarea"
-            :autosize="{ minRows: 2, maxRows: 6 }"
-            placeholder="选填；与本集配置中的「资产生图模型 id」同时填写且此处非空时，随图生请求传入"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showEditCharacter = false">取消</el-button>
-        <el-button type="primary" :loading="editCharacterSaving" :disabled="!editCharacterForm?.name?.trim()" @click="submitEditCharacter">{{ editCharacterForm?.id ? '保存' : '添加' }}</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- Seedance 2.0 / 即梦素材库 角色认证信息 -->
-    <el-dialog v-model="showCharSd2Cert" title="SD2 素材认证信息（即梦素材库）" width="520px" destroy-on-close>
-      <template v-if="charSd2CertPayload">
-        <el-descriptions :column="1" border size="small">
-          <el-descriptions-item label="素材 ID">{{ charSd2CertPayload.hub_asset_id || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="asset_url（视频生成引用）">
-            <code class="sd2-mono">{{ charSd2CertPayload.asset_url || '—' }}</code>
-          </el-descriptions-item>
-          <el-descriptions-item label="状态">{{ charSd2CertPayload.status || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="注册时图片 URL">
-            <span class="sd2-break">{{ charSd2CertPayload.source_image_url || '—' }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item v-if="charSd2CertPayload.character_display" label="备案角色信息">
-            <div class="sd2-break">名称：{{ charSd2CertPayload.character_display.name || '—' }}</div>
-            <div v-if="charSd2CertPayload.character_display.appearance" class="sd2-break muted">外貌摘要：{{ charSd2CertPayload.character_display.appearance }}</div>
-          </el-descriptions-item>
-        </el-descriptions>
-        <p class="sd2-doc-tip">
-          接口与字段说明见
-          <a href="https://83zi.com/sd2realperson.html" target="_blank" rel="noopener noreferrer">即梦/Seedance 素材管理 API（文档示例）</a>
-          ；请在「AI 配置」中新增「即梦2角色认证」，填写网关 URL 与 Token。生成视频时在内容中传入 <code>image_url.url = asset_url</code> 即可引用。
-        </p>
-      </template>
-      <template #footer>
-        <el-button @click="showCharSd2Cert = false">关闭</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 编辑道具弹窗 -->
-    <el-dialog v-model="showEditProp" :title="editPropForm?.id ? '编辑道具' : '添加道具'" width="75%" @close="onClosePropDialog">
-      <el-form v-if="editPropForm" label-width="90px">
-        <!-- 参考图上传区（新增/编辑均显示） -->
-        <el-form-item label="参考图">
-          <div class="ref-image-zone">
-            <div class="ref-image-box" @click="addPropRefFileInput?.click()" @drop.prevent="onRefImageDrop('prop', $event)" @dragover.prevent>
-              <img v-if="addPropRefImage" :src="addPropRefImage.dataUrl" class="ref-preview-img" />
-              <img v-else-if="editPropForm.ref_image"
-                :src="editPropForm.ref_image.startsWith('http') ? editPropForm.ref_image : '/static/' + editPropForm.ref_image"
-                class="ref-preview-img" />
-              <img v-else-if="editPropForm.id && (editPropForm.image_url || editPropForm.local_path)"
-                :src="assetImageUrl(editPropForm)" class="ref-preview-img" style="opacity:0.5" />
-              <div v-else class="ref-upload-hint"><span class="ref-upload-icon">🖼</span><span>点击或拖入参考图</span></div>
-            </div>
-            <div v-if="addPropRefImage" class="ref-actions">
-              <el-button type="primary" size="small" :loading="extractingPropDesc" @click="doExtractFromRef('prop')">提取特征描述</el-button>
-              <el-button size="small" @click="addPropRefImage = null">移除</el-button>
-            </div>
-            <div v-else-if="editPropForm.ref_image" class="ref-actions">
-              <el-button type="primary" size="small" :loading="extractingPropDesc" @click="doExtractPropFromImage">从参考图提取描述</el-button>
-              <el-button size="small" @click="clearPropRefImage">移除参考图</el-button>
-            </div>
-            <div v-else-if="editPropForm.id && (editPropForm.image_url || editPropForm.local_path) && !editPropForm.description" class="ref-actions">
-              <el-button size="small" :loading="extractingPropDesc" @click="doExtractPropFromImage">从主图提取描述</el-button>
-            </div>
-          </div>
-        </el-form-item>
-        <el-form-item label="名称" required>
-          <el-input v-model="editPropForm.name" placeholder="道具名称" />
-        </el-form-item>
-        <el-form-item label="类型">
-          <el-input v-model="editPropForm.type" placeholder="如：物品、建筑" />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="editPropForm.description" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="道具描述" />
-        </el-form-item>
-        <el-form-item label="图生提示词">
-          <div style="width:100%">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-              <span style="font-size:12px;color:#909399">AI 润色后的图片提示词，生成图片时直接使用；可手动修改</span>
-              <el-button size="small" :loading="editPropPromptGenerating" @click="doGeneratePropPrompt">重新生成提示词</el-button>
-            </div>
-            <el-input
-              v-model="editPropForm.prompt"
-              type="textarea"
-              :autosize="{ minRows: 5, maxRows: 16 }"
-              :placeholder="editPropPromptGenerating ? 'AI 正在生成提示词，请稍候…' : '点击「重新生成提示词」由 AI 自动生成，或直接在此输入'"
-              :disabled="editPropPromptGenerating"
-            />
-          </div>
-        </el-form-item>
-        <el-form-item label="负面提示词">
-          <el-input
-            v-model="editPropForm.negative_prompt"
-            type="textarea"
-            :autosize="{ minRows: 2, maxRows: 6 }"
-            placeholder="选填；与本集配置中的「资产生图模型 id」同时填写且此处非空时，随图生请求传入"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showEditProp = false">取消</el-button>
-        <el-button type="primary" :loading="editPropSaving" :disabled="!editPropForm?.name?.trim()" @click="submitEditProp">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 添加/编辑场景弹窗 -->
-    <el-dialog v-model="showEditScene" :title="editSceneForm?.id ? '编辑场景' : '添加场景'" width="75%" @close="onCloseSceneDialog">
-      <el-form v-if="editSceneForm" label-width="90px">
-        <!-- 参考图上传区（新增/编辑均显示） -->
-        <el-form-item label="参考图">
-          <div class="ref-image-zone">
-            <div class="ref-image-box" @click="addSceneRefFileInput?.click()" @drop.prevent="onRefImageDrop('scene', $event)" @dragover.prevent>
-              <img v-if="addSceneRefImage" :src="addSceneRefImage.dataUrl" class="ref-preview-img" />
-              <img v-else-if="editSceneForm.ref_image"
-                :src="editSceneForm.ref_image.startsWith('http') ? editSceneForm.ref_image : '/static/' + editSceneForm.ref_image"
-                class="ref-preview-img" />
-              <img v-else-if="editSceneForm.id && (editSceneForm.image_url || editSceneForm.local_path)"
-                :src="assetImageUrl(editSceneForm)" class="ref-preview-img" style="opacity:0.5" />
-              <div v-else class="ref-upload-hint"><span class="ref-upload-icon">🖼</span><span>点击或拖入参考图</span></div>
-            </div>
-            <div v-if="addSceneRefImage" class="ref-actions">
-              <el-button type="primary" size="small" :loading="extractingSceneDesc" @click="doExtractFromRef('scene')">提取特征描述</el-button>
-              <el-button size="small" @click="addSceneRefImage = null">移除</el-button>
-            </div>
-            <div v-else-if="editSceneForm.ref_image" class="ref-actions">
-              <el-button type="primary" size="small" :loading="extractingSceneDesc" @click="doExtractSceneFromImage">从参考图提取描述</el-button>
-              <el-button size="small" @click="clearSceneRefImage">移除参考图</el-button>
-            </div>
-            <div v-else-if="editSceneForm.id && (editSceneForm.image_url || editSceneForm.local_path) && !editSceneForm.prompt" class="ref-actions">
-              <el-button size="small" :loading="extractingSceneDesc" @click="doExtractSceneFromImage">从主图提取描述</el-button>
-            </div>
-          </div>
-        </el-form-item>
-        <el-form-item label="地点" required>
-          <el-input v-model="editSceneForm.location" placeholder="如：森林、教室" />
-        </el-form-item>
-        <el-form-item label="时间">
-          <el-input v-model="editSceneForm.time" placeholder="如：白天、傍晚" />
-        </el-form-item>
-        <el-form-item label="场景描述">
-          <el-input v-model="editSceneForm.prompt" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="场景的简要描述，供 AI 生成四视图时参考" />
-        </el-form-item>
-        <el-form-item v-if="editSceneForm.id">
-          <template #label>
-            <span style="font-size:12px;line-height:1.4;white-space:normal;word-break:break-all;display:inline-block;width:90px">四视图提示词</span>
-          </template>
-          <div style="width:100%">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-              <span style="font-size:12px;color:#909399">AI 生成的完整四视图图片提示词，生图时直接使用；可手动修改</span>
-              <el-button size="small" :loading="editScenePromptGenerating" @click="doGenerateScenePrompt">重新生成提示词</el-button>
-            </div>
-            <el-input
-              v-model="editSceneForm.polished_prompt"
-              type="textarea"
-              :autosize="{ minRows: 5, maxRows: 16 }"
-              :placeholder="editScenePromptGenerating ? 'AI 正在生成四视图提示词，请稍候…' : '点击「重新生成提示词」由 AI 自动生成，或直接在此输入'"
-              :disabled="editScenePromptGenerating"
-              style="font-size:12px"
-            />
-          </div>
-        </el-form-item>
-        <el-form-item label="负面提示词">
-          <el-input
-            v-model="editSceneForm.negative_prompt"
-            type="textarea"
-            :autosize="{ minRows: 2, maxRows: 6 }"
-            placeholder="选填；与本集配置中的「资产生图模型 id」同时填写且此处非空时，随图生请求传入"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showEditScene = false">取消</el-button>
-        <el-button type="primary" :loading="editSceneSaving" :disabled="!editSceneForm?.location?.trim()" @click="submitEditScene">{{ editSceneForm?.id ? '保存' : '添加' }}</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 本剧角色库 -->
-    <el-dialog v-model="showCharLibrary" title="本剧角色库" width="720px" destroy-on-close class="library-dialog" @open="loadCharLibraryList">
-      <div class="library-toolbar">
-        <el-input v-model="charLibraryKeyword" placeholder="搜索名称或描述" clearable style="width: 200px" @input="debouncedLoadCharLibrary()" />
-      </div>
-      <div v-loading="charLibraryLoading" class="library-list">
-        <div v-for="item in charLibraryList" :key="item.id" class="library-item">
-          <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item))">
-            <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
-            <span v-else class="library-item-placeholder">暂无图</span>
-          </div>
-          <div class="library-item-info">
-            <div class="library-item-name">{{ item.name || '未命名' }}</div>
-            <div class="library-item-desc">{{ (item.description || '').slice(0, 60) }}{{ (item.description || '').length > 60 ? '…' : '' }}</div>
-            <div class="library-item-actions">
-              <el-button size="small" type="primary" :loading="addingCharFromLibraryId === item.id" :disabled="!currentEpisodeId" @click="onAddCharFromLibrary(item)">加入本集</el-button>
-              <el-button size="small" @click="openEditCharLibrary(item)">编辑</el-button>
-              <el-button size="small" type="danger" plain @click="onDeleteCharLibrary(item)">删除</el-button>
-            </div>
-          </div>
-        </div>
-        <div v-if="!charLibraryLoading && charLibraryList.length === 0" class="library-empty">暂无本剧角色库记录，可将本剧角色「加入本剧库」后在此查看</div>
-      </div>
-      <div class="library-pagination">
-        <el-pagination
-          v-model:current-page="charLibraryPage"
-          v-model:page-size="charLibraryPageSize"
-          :total="charLibraryTotal"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-          @current-change="loadCharLibraryList"
-          @size-change="loadCharLibraryList"
-        />
-      </div>
-      <template #footer>
-        <el-button @click="showCharLibrary = false">关闭</el-button>
-      </template>
-    </el-dialog>
-    <!-- 编辑公共角色 -->
-    <el-dialog v-model="showEditCharLibrary" title="编辑公共角色" width="440px" @close="editCharLibraryForm = null">
-      <el-form v-if="editCharLibraryForm" label-width="80px">
-        <el-form-item label="名称">
-          <el-input v-model="editCharLibraryForm.name" placeholder="角色名称" />
-        </el-form-item>
-        <el-form-item label="分类">
-          <el-input v-model="editCharLibraryForm.category" placeholder="可选" />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="editCharLibraryForm.description" type="textarea" :rows="3" placeholder="可选" />
-        </el-form-item>
-        <el-form-item label="标签">
-          <el-input v-model="editCharLibraryForm.tags" placeholder="可选，逗号分隔" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showEditCharLibrary = false">取消</el-button>
-        <el-button type="primary" :loading="editCharLibrarySaving" @click="submitEditCharLibrary">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 本剧道具库 -->
-    <el-dialog v-model="showPropLibrary" title="本剧道具库" width="720px" destroy-on-close class="library-dialog" @open="loadPropLibraryList">
-      <div class="library-toolbar">
-        <el-input v-model="propLibraryKeyword" placeholder="搜索名称或描述" clearable style="width: 200px" @input="debouncedLoadPropLibrary()" />
-      </div>
-      <div v-loading="propLibraryLoading" class="library-list">
-        <div v-for="item in propLibraryList" :key="item.id" class="library-item">
-          <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item))">
-            <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
-            <span v-else class="library-item-placeholder">暂无图</span>
-          </div>
-          <div class="library-item-info">
-            <div class="library-item-name">{{ item.name || '未命名' }}</div>
-            <div class="library-item-desc">{{ (item.description || item.prompt || '').slice(0, 60) }}{{ (item.description || item.prompt || '').length > 60 ? '…' : '' }}</div>
-            <div class="library-item-actions">
-              <el-button size="small" type="primary" :loading="addingPropFromLibraryId === item.id" :disabled="!currentEpisodeId" @click="onAddPropFromLibrary(item)">加入本集</el-button>
-              <el-button size="small" @click="openEditPropLibrary(item)">编辑</el-button>
-              <el-button size="small" type="danger" plain @click="onDeletePropLibrary(item)">删除</el-button>
-            </div>
-          </div>
-        </div>
-        <div v-if="!propLibraryLoading && propLibraryList.length === 0" class="library-empty">暂无本剧道具库记录，可将本剧道具「加入本剧库」后在此查看</div>
-      </div>
-      <div class="library-pagination">
-        <el-pagination
-          v-model:current-page="propLibraryPage"
-          v-model:page-size="propLibraryPageSize"
-          :total="propLibraryTotal"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-          @current-change="loadPropLibraryList"
-          @size-change="loadPropLibraryList"
-        />
-      </div>
-      <template #footer>
-        <el-button @click="showPropLibrary = false">关闭</el-button>
-      </template>
-    </el-dialog>
-    <!-- 编辑公共道具 -->
-    <el-dialog v-model="showEditPropLibrary" title="编辑公共道具" width="440px" @close="editPropLibraryForm = null">
-      <el-form v-if="editPropLibraryForm" label-width="80px">
-        <el-form-item label="名称">
-          <el-input v-model="editPropLibraryForm.name" placeholder="道具名称" />
-        </el-form-item>
-        <el-form-item label="分类">
-          <el-input v-model="editPropLibraryForm.category" placeholder="可选" />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="editPropLibraryForm.description" type="textarea" :rows="3" placeholder="可选" />
-        </el-form-item>
-        <el-form-item label="标签">
-          <el-input v-model="editPropLibraryForm.tags" placeholder="可选，逗号分隔" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showEditPropLibrary = false">取消</el-button>
-        <el-button type="primary" :loading="editPropLibrarySaving" @click="submitEditPropLibrary">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 本剧场景库 -->
-    <el-dialog v-model="showSceneLibrary" title="本剧场景库" width="720px" destroy-on-close class="library-dialog" @open="loadSceneLibraryList">
-      <div class="library-toolbar">
-        <el-input v-model="sceneLibraryKeyword" placeholder="搜索地点或描述" clearable style="width: 200px" @input="debouncedLoadSceneLibrary()" />
-      </div>
-      <div v-loading="sceneLibraryLoading" class="library-list">
-        <div v-for="item in sceneLibraryList" :key="item.id" class="library-item">
-          <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item))">
-            <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
-            <span v-else class="library-item-placeholder">暂无图</span>
-          </div>
-          <div class="library-item-info">
-            <div class="library-item-name">{{ item.location || item.time || '未命名' }}</div>
-            <div class="library-item-desc">{{ (item.description || item.prompt || '').slice(0, 60) }}{{ (item.description || item.prompt || '').length > 60 ? '…' : '' }}</div>
-            <div class="library-item-actions">
-              <el-button size="small" type="primary" :loading="addingSceneFromLibraryId === item.id" :disabled="!currentEpisodeId" @click="onAddSceneFromLibrary(item)">加入本集</el-button>
-              <el-button size="small" @click="openEditSceneLibrary(item)">编辑</el-button>
-              <el-button size="small" type="danger" plain @click="onDeleteSceneLibrary(item)">删除</el-button>
-            </div>
-          </div>
-        </div>
-        <div v-if="!sceneLibraryLoading && sceneLibraryList.length === 0" class="library-empty">暂无本剧场景库记录，可将本剧场景「加入本剧库」后在此查看</div>
-      </div>
-      <div class="library-pagination">
-        <el-pagination
-          v-model:current-page="sceneLibraryPage"
-          v-model:page-size="sceneLibraryPageSize"
-          :total="sceneLibraryTotal"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-          @current-change="loadSceneLibraryList"
-          @size-change="loadSceneLibraryList"
-        />
-      </div>
-      <template #footer>
-        <el-button @click="showSceneLibrary = false">关闭</el-button>
-      </template>
-    </el-dialog>
-    <!-- 编辑公共场景 -->
-    <el-dialog v-model="showEditSceneLibrary" title="编辑公共场景" width="440px" @close="editSceneLibraryForm = null">
-      <el-form v-if="editSceneLibraryForm" label-width="80px">
-        <el-form-item label="地点">
-          <el-input v-model="editSceneLibraryForm.location" placeholder="场景地点" />
-        </el-form-item>
-        <el-form-item label="时间">
-          <el-input v-model="editSceneLibraryForm.time" placeholder="如：浅色/夜晚" />
-        </el-form-item>
-        <el-form-item label="分类">
-          <el-input v-model="editSceneLibraryForm.category" placeholder="可选" />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="editSceneLibraryForm.description" type="textarea" :rows="3" placeholder="可选" />
-        </el-form-item>
-        <el-form-item label="标签">
-          <el-input v-model="editSceneLibraryForm.tags" placeholder="可选，逗号分隔" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showEditSceneLibrary = false">取消</el-button>
-        <el-button type="primary" :loading="editSceneLibrarySaving" @click="submitEditSceneLibrary">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 分镜提示词编辑弹窗 -->
-    <el-dialog
-      v-model="showSbPromptDialog"
-      :title="`分镜 ${sbPromptTarget?.storyboard_number ?? ''} · 编辑提示词`"
-      width="700px"
-      @close="sbPromptTarget = null"
-    >
-      <el-form v-if="sbPromptTarget" label-width="0" class="sb-prompt-dialog-form">
-        <!-- 图片区 -->
-        <div class="sb-prompt-section-title">🖼 图片提示词</div>
-        <el-form-item label="">
-          <div style="width:100%">
-            <div style="font-size:12px; color:#6b7280; margin-bottom:4px;">原始提示词（分镜生成时写入，仅供参考）</div>
-            <el-input
-              v-model="sbPromptImageText"
-              type="textarea"
-              :rows="4"
-              placeholder="分镜生成时由 AI 写入的原始描述"
-            />
-          </div>
-        </el-form-item>
-        <el-form-item label="">
-          <div style="width:100%">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-              <span style="font-size:12px; color:#6b7280;">优化提示词（AI 润色后的英文 prompt，生图时优先使用）</span>
-              <el-button
-                size="small"
-                type="warning"
-                plain
-                :loading="sbPromptPolishing"
-                @click="onPolishSbPrompt"
-              >{{ sbPromptPolishedText ? '重新生成' : '立即生成' }}</el-button>
-            </div>
-            <el-input
-              v-model="sbPromptPolishedText"
-              type="textarea"
-              :rows="5"
-              placeholder="点击「立即生成」让 AI 润色，或手动填写英文 prompt"
-            />
-          </div>
-        </el-form-item>
-        <!-- 视频区 -->
-        <div class="sb-prompt-section-title sb-prompt-video-title-row" style="margin-top:12px;">
-          <span>🎬 经典视频提示词</span>
-          <el-button
-            v-if="!isSbUniversalMode(sbPromptTarget.id)"
-            size="small"
-            type="success"
-            plain
-            :loading="classicVideoPolishIds.has(sbPromptTarget.id)"
-            @click="onPolishClassicVideoPromptStream(sbPromptTarget, { fromDialog: true })"
-          >润色分镜视频提示词</el-button>
-        </div>
-        <el-form-item label="">
-          <el-input
-            v-model="sbPromptVideoText"
-            type="textarea"
-            :rows="5"
-            placeholder="视频生成提示词（可选，留空则由系统自动生成）"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showSbPromptDialog = false">取消</el-button>
-        <el-button type="primary" :loading="sbPromptSaving" @click="onSaveSbPromptDialog">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 分镜视频参数编辑弹窗 -->
-    <el-dialog
-      v-model="showVideoParamsDialog"
-      :title="`分镜 ${videoParamsTarget?.storyboard_number ?? ''} · 视频参数`"
-      width="680px"
-      destroy-on-close
-      @close="onVideoParamsDialogClosed"
-    >
-      <el-form v-if="videoParamsTarget" label-width="70px" size="small" class="vp-dialog-form">
-        <el-form-item label="创作模式">
-          <el-radio-group
-            :model-value="sbCreationMode[videoParamsTarget.id] === 'universal' ? 'universal' : 'classic'"
-            size="small"
-            @change="(v) => setSbCreationModeId(videoParamsTarget.id, v)"
-          >
-            <el-radio-button value="classic">经典分镜</el-radio-button>
-            <el-radio-button value="universal">全能模式</el-radio-button>
-          </el-radio-group>
-          <div class="vp-mode-hint">全能模式：中间为片段描述；生视频时使用 <strong>AI 配置里当前启用的视频</strong>（接口规范 <code>kling_omni</code> 或 <code>volcengine_omni</code>，模型如 <code>kling-video-o1</code>、<code>doubao-seedance-2-0-260128</code> 等）并合并场景/角色/道具等参考图（不含经典分镜主图）。经典字段保留，可随时切回。</div>
-        </el-form-item>
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="标题">
-              <el-input v-model="sbTitle[videoParamsTarget.id]" placeholder="镜头标题" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="地点">
-              <el-input v-model="sbLocation[videoParamsTarget.id]" placeholder="场景地点" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="时间">
-              <el-input v-model="sbTime[videoParamsTarget.id]" placeholder="清晨/午后" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="12">
-          <el-col :span="6">
-            <el-form-item label="时长(秒)">
-              <el-input-number v-model="sbDuration[videoParamsTarget.id]" :min="1" :max="60" style="width:100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="景别">
-              <el-select v-model="sbShotType[videoParamsTarget.id]" placeholder="景别" style="width:100%">
-                <el-option label="大远景" value="大远景" />
-                <el-option label="远景" value="远景" />
-                <el-option label="中景" value="中景" />
-                <el-option label="近景" value="近景" />
-                <el-option label="特写" value="特写" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="运镜">
-              <el-select v-model="sbMovement[videoParamsTarget.id]" placeholder="运镜" style="width:100%" clearable>
-                <el-option label="固定" value="static" />
-                <el-option label="推镜" value="push" />
-                <el-option label="拉镜" value="pull" />
-                <el-option label="横摇" value="pan" />
-                <el-option label="纵摇" value="tilt" />
-                <el-option label="跟镜" value="tracking" />
-                <el-option label="升镜" value="crane_up" />
-                <el-option label="降镜" value="crane_dn" />
-                <el-option label="环绕" value="orbit" />
-                <el-option label="手持" value="handheld" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="氛围">
-              <el-input v-model="sbAtmosphere[videoParamsTarget.id]" placeholder="氛围/情绪" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="12">
-          <el-col :span="8">
-            <el-form-item label="镜头视角">
-              <div style="display:flex;gap:4px;flex-wrap:wrap">
-                <el-select v-model="sbAngleS[videoParamsTarget.id]" placeholder="景别" style="width:76px">
-                  <el-option label="特写" value="close_up" />
-                  <el-option label="中景" value="medium" />
-                  <el-option label="远景" value="wide" />
-                </el-select>
-                <el-select v-model="sbAngleV[videoParamsTarget.id]" placeholder="俯仰" style="width:86px">
-                  <el-option label="平视" value="eye_level" />
-                  <el-option label="低角仰拍" value="low" />
-                  <el-option label="高角俯拍" value="high" />
-                  <el-option label="虫眼仰视" value="worm" />
-                </el-select>
-                <el-select v-model="sbAngleH[videoParamsTarget.id]" placeholder="方向" style="width:80px">
-                  <el-option label="正面" value="front" />
-                  <el-option label="前左45°" value="front_left" />
-                  <el-option label="左侧" value="left" />
-                  <el-option label="后左135°" value="back_left" />
-                  <el-option label="背面" value="back" />
-                  <el-option label="后右135°" value="back_right" />
-                  <el-option label="右侧" value="right" />
-                  <el-option label="前右45°" value="front_right" />
-                </el-select>
-                <span v-if="sbAngleS[videoParamsTarget.id] && sbAngleV[videoParamsTarget.id] && sbAngleH[videoParamsTarget.id]"
-                      style="font-size:11px;color:#6b7280;background:#f3f4f6;padding:2px 6px;border-radius:4px;white-space:nowrap">
-                  {{ angleToPromptFragment(sbAngleH[videoParamsTarget.id], sbAngleV[videoParamsTarget.id], sbAngleS[videoParamsTarget.id]).label }}
-                </span>
-              </div>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="灯光">
-              <el-select v-model="sbLighting[videoParamsTarget.id]" placeholder="灯光风格" style="width:100%" clearable>
-                <el-option label="自然光" value="natural" />
-                <el-option label="顺光" value="front" />
-                <el-option label="侧光" value="side" />
-                <el-option label="逆光" value="backlit" />
-                <el-option label="顶光" value="top" />
-                <el-option label="底光" value="under" />
-                <el-option label="柔光" value="soft" />
-                <el-option label="戏剧光" value="dramatic" />
-                <el-option label="黄金时段" value="golden_hour" />
-                <el-option label="蓝调时刻" value="blue_hour" />
-                <el-option label="夜景" value="night" />
-                <el-option label="霓虹" value="neon" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="景深">
-              <el-select v-model="sbDof[videoParamsTarget.id]" placeholder="景深" style="width:100%" clearable>
-                <el-option label="极浅景深" value="extreme_shallow" />
-                <el-option label="浅景深" value="shallow" />
-                <el-option label="中景深" value="medium" />
-                <el-option label="深景深（全焦）" value="deep" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="动作">
-          <el-input v-model="sbAction[videoParamsTarget.id]" type="textarea" :rows="2" placeholder="动作描述" />
-        </el-form-item>
-        <el-form-item label="对白">
-          <el-input v-model="sbDialogue[videoParamsTarget.id]" type="textarea" :rows="2" placeholder="角色对白" />
-        </el-form-item>
-        <el-form-item label="解说旁白">
-          <el-input v-model="sbNarration[videoParamsTarget.id]" type="textarea" :rows="2" class="sb-narration-input" placeholder="画外解说 / 纪录片式旁白（与对白分开）" />
-        </el-form-item>
-        <el-form-item label="画面结果">
-          <el-input v-model="sbResult[videoParamsTarget.id]" type="textarea" :rows="2" placeholder="动作完成后的画面结果" />
-        </el-form-item>
-        <el-form-item label="视频提示词">
-          <el-input
-            :model-value="buildVideoPromptFromFields(videoParamsTarget.id)"
-            type="textarea"
-            :rows="3"
-            readonly
-            placeholder="保存后自动生成"
-            style="color:#6b7280"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showVideoParamsDialog = false">取消</el-button>
-        <el-button type="primary" :loading="videoParamsSaving" @click="onSaveVideoParams">保存并更新</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- P1-2: 导入小说弹窗 -->
-    <el-dialog v-model="showNovelImport" title="导入小说/长文" width="600px" @close="novelImportReset">
-      <div class="novel-import-dialog">
-        <p style="color:#6b7280;font-size:13px;margin-bottom:12px">支持粘贴小说文本或上传 txt 文件，AI 自动识别章节并转换为剧本集数</p>
-        <el-tabs v-model="novelImportMode">
-          <el-tab-pane label="粘贴文本" name="text">
-            <el-input
-              v-model="novelText"
-              type="textarea"
-              :rows="10"
-              placeholder="粘贴小说正文，AI 会自动识别章节..."
-            />
-          </el-tab-pane>
-          <el-tab-pane label="上传文件" name="file">
-            <el-upload
-              drag
-              :auto-upload="false"
-              :on-change="onNovelFileChange"
-              accept=".txt,.md"
-              :show-file-list="false"
-            >
-              <el-icon class="el-icon--upload"><DocumentAdd /></el-icon>
-              <div class="el-upload__text">拖拽 .txt / .md 文件到此处，或<em>点击上传</em></div>
-            </el-upload>
-            <div v-if="novelFileName" style="margin-top:8px;font-size:13px;color:#409eff">已选择：{{ novelFileName }}</div>
-          </el-tab-pane>
-        </el-tabs>
-        <div class="novel-import-options" style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:6px;font-size:13px">
-            <span>最多导入集数：</span>
-            <el-input-number v-model="novelMaxChapters" :min="1" :max="20" size="small" style="width:100px" />
-          </div>
-          <el-checkbox v-model="novelAiSummarize" size="small">AI 转换为剧本格式（会消耗 Token）</el-checkbox>
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="showNovelImport = false">取消</el-button>
-        <el-button type="primary" :loading="novelImporting" @click="onImportNovel">开始导入</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 已有剧本时：覆盖或追加新集 -->
-    <el-dialog v-model="showGenerateStoryModeDialog" title="已有剧本" width="480px" destroy-on-close>
-      <p style="margin: 0 0 14px; font-size: 14px; color: var(--el-text-color-regular); line-height: 1.5">
-        本剧已有剧集剧本，请选择本次生成结果的保存方式：
-      </p>
-      <el-radio-group v-model="generateStorySaveMode" class="generate-story-mode-radios">
-        <!-- Element Plus 2.6+：选项值用 value，勿仅用 label -->
-        <el-radio value="overwrite" class="generate-story-mode-radio">
-          覆盖：丢弃原有剧集，仅保留本次 AI 生成的集数
-        </el-radio>
-        <el-radio value="append" class="generate-story-mode-radio">
-          新增：保留原有剧集，在末尾追加本次生成的新集
-        </el-radio>
-      </el-radio-group>
-      <template #footer>
-        <el-button @click="showGenerateStoryModeDialog = false">取消</el-button>
-        <el-button type="primary" :loading="storyGenerating" @click="onConfirmGenerateStoryMode">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- AI 配置弹窗（不跳转，避免本页内容丢失） -->
-    <el-dialog v-model="showAiConfigDialog" title="AI 配置" width="90%" destroy-on-close class="ai-config-dialog">
-      <AIConfigContent v-if="showAiConfigDialog" />
-    </el-dialog>
-
-    <!-- 图片放大预览：点击遮罩或图片关闭 -->
-    <Teleport to="body">
-      <div
-        v-if="previewImageUrl"
-        class="image-preview-overlay"
-        @click="closeImagePreview"
-      >
-        <img :src="previewImageUrl" alt="" class="image-preview-img" @click.stop="closeImagePreview" />
-      </div>
-    </Teleport>
+    <!-- 其他对话框 -->
+    <FilmCreateDialogs
+      :show-sb-prompt-dialog="showSbPromptDialog"
+      :sb-prompt-target="sbPromptTarget"
+      :sb-prompt-image-text="sbPromptImageText"
+      :sb-prompt-polished-text="sbPromptPolishedText"
+      :sb-prompt-video-text="sbPromptVideoText"
+      :sb-prompt-saving="sbPromptSaving"
+      :sb-prompt-polishing="sbPromptPolishing"
+      :sb-prompt-target-universal="sbPromptTarget && isSbUniversalMode(sbPromptTarget.id)"
+      :sb-prompt-classic-polishing="false"
+      :show-video-params-dialog="showVideoParamsDialog"
+      :video-params-target="videoParamsTarget"
+      :video-params-saving="videoParamsSaving"
+      :inferring-params="inferringParams"
+      :video-params-form="{
+        creationMode: sbCreationMode[videoParamsTarget?.id] || '',
+        title: sbTitle[videoParamsTarget?.id] || '',
+        location: sbLocation[videoParamsTarget?.id] || '',
+        time: sbTime[videoParamsTarget?.id] || '',
+        duration: sbDuration[videoParamsTarget?.id] || '',
+        shotType: sbShotType[videoParamsTarget?.id] || '',
+        movement: sbMovement[videoParamsTarget?.id] || '',
+        atmosphere: sbAtmosphere[videoParamsTarget?.id] || '',
+        angle: sbAngle[videoParamsTarget?.id] || '',
+        angleH: sbAngleH[videoParamsTarget?.id] || '',
+        angleV: sbAngleV[videoParamsTarget?.id] || '',
+        angleS: sbAngleS[videoParamsTarget?.id] || '',
+        lighting: sbLighting[videoParamsTarget?.id] || '',
+        dof: sbDof[videoParamsTarget?.id] || '',
+        action: sbAction[videoParamsTarget?.id] || '',
+        dialogue: sbDialogue[videoParamsTarget?.id] || '',
+        narration: sbNarration[videoParamsTarget?.id] || '',
+        result: sbResult[videoParamsTarget?.id] || '',
+      }"
+      :video-prompt-preview="videoParamsTarget ? buildVideoPromptFromFields(videoParamsTarget.id) : ''"
+      :show-novel-import="showNovelImport"
+      :novel-import-mode="novelImportMode"
+      :novel-text="novelText"
+      :novel-file-name="novelFileName"
+      :novel-file-content="novelFileContent"
+      :novel-max-chapters="novelMaxChapters"
+      :novel-ai-summarize="novelAiSummarize"
+      :novel-importing="novelImporting"
+      :show-generate-story-mode-dialog="showGenerateStoryModeDialog"
+      :generate-story-save-mode="generateStorySaveMode"
+      :story-generating="storyGenerating"
+      :show-ai-config-dialog="showAiConfigDialog"
+      :preview-image-url="previewImageUrl"
+      @save:sb-prompt="onSaveSbPromptDialog"
+      @cancel:sb-prompt="showSbPromptDialog = false"
+      @polish:sb-prompt="onPolishSbPrompt"
+      @update:sb-prompt-image-text="v => sbPromptImageText = v"
+      @update:sb-prompt-polished-text="v => sbPromptPolishedText = v"
+      @update:sb-prompt-video-text="v => sbPromptVideoText = v"
+      @save:video-params="onSaveVideoParams"
+      @cancel:video-params="showVideoParamsDialog = false; onVideoParamsDialogClosed()"
+      @infer:video-params="onBatchInferParams"
+      @update:video-params-form="form => onSaveSbVideoFields(videoParamsTarget?.id, form)"
+      @submit:novel-import="onImportNovel"
+      @cancel:novel-import="showNovelImport = false"
+      @update:novel-text="v => novelText = v"
+      @update:novel-file="args => { novelFileName = args.name; novelFileContent = args.content }"
+      @update:novel-import-mode="v => novelImportMode = v"
+      @update:novel-max-chapters="v => novelMaxChapters = v"
+      @update:novel-ai-summarize="v => novelAiSummarize = v"
+      @submit:generate-story-mode="onConfirmGenerateStoryMode"
+      @cancel:generate-story-mode="showGenerateStoryModeDialog = false"
+      @update:generate-story-save-mode="v => generateStorySaveMode = v"
+      @update:show-ai-config-dialog="v => showAiConfigDialog = v"
+      @close:preview="closeImagePreview"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, reactive, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, reactive, nextTick, defineAsyncComponent, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -2225,13 +740,24 @@ import { sceneLibraryAPI } from '@/api/sceneLibrary'
 import { propLibraryAPI } from '@/api/propLibrary'
 import { generationSettingsAPI } from '@/api/prompts'
 import StylePickerButton from '@/components/StylePickerButton.vue'
-import AIConfigContent from '@/components/AIConfigContent.vue'
+const AIConfigContent = defineAsyncComponent(() => import('@/components/AIConfigContent.vue'))
 import UniversalSegmentOmniAtEditor from '@/components/UniversalSegmentOmniAtEditor.vue'
+import AppHeader from '@/components/filmCreate/AppHeader.vue'
+import SidebarNav from '@/components/filmCreate/SidebarNav.vue'
+import ResourcePanel from '@/components/filmCreate/ResourcePanel.vue'
+import StoryboardSection from '@/components/filmCreate/StoryboardSection.vue'
+import ResourceEditDialogs from '@/components/filmCreate/ResourceEditDialogs.vue'
+import LibraryDialogs from '@/components/filmCreate/LibraryDialogs.vue'
+import FilmCreateDialogs from '@/components/filmCreate/FilmCreateDialogs.vue'
 import { generationStyleOptions, getStylePromptEn, getStylePromptZh, stylePromptMetadataForSave, backfillDramaStylePromptMetadataIfNeeded } from '@/constants/styleOptions'
 import { useNavigation } from '@/composables/filmCreate/useNavigation'
 import { useCharacters } from '@/composables/filmCreate/useCharacters'
 import { useProps as usePropsComposable } from '@/composables/filmCreate/useProps'
 import { useScenes } from '@/composables/filmCreate/useScenes'
+import { trackPollTimer, cancelAllPolls } from '@/composables/filmCreate/usePollTask'
+import { useAutoSave } from '@/composables/filmCreate/useAutoSave'
+import { friendlyError } from '@/utils/errorMessages'
+import { assetImageUrl, hasAssetImage, localPathToUrl } from '@/utils/assetImageUrl'
 
 const route = useRoute()
 const router = useRouter()
@@ -2239,6 +765,7 @@ const store = useFilmStore()
 const { isDark, toggle: toggleTheme } = useTheme()
 const { videoResolution: storeVideoResolution } = storeToRefs(store)
 
+// ── Provide storyboard state for StoryboardSection inject ─────
 // ── Composable: Navigation ─────────────────────────────
 const { navCollapsed, storyboardMenuExpanded, toggleNav, scrollToTop, scrollToAnchor } = useNavigation()
 
@@ -2329,6 +856,12 @@ const videoWatermark = ref(false)
 /** 水印开启时烧录到成片右下角 */
 const videoWatermarkText = ref('')
 
+// ── Auto-save for script content ─────────────────────────────
+const { status: scriptAutoSaveStatus } = useAutoSave(scriptContent, {
+  saveFn: (content) => saveScriptToBackend(content),
+  debounceMs: 1500,
+  shouldSave: (v) => !!(v && v.trim()),
+})
 const dramaId = computed(() => store.dramaId)
 const characters = computed(() => store.characters)
 const scenes = computed(() => store.scenes)
@@ -2432,6 +965,7 @@ const {
   loadCharLibraryList, debouncedLoadCharLibrary, openEditCharLibrary, submitEditCharLibrary,
   onDeleteCharLibrary, onAddCharacterToLibrary, onAddCharacterToMaterialLibrary, onSd2CertifyCharacter,
   onSd2CertifyRefresh, openCharSd2CertDialog, onAddCharFromLibrary,
+  cleanup: cleanupCharacters,
 } = useCharacters({ store, dramaId, currentEpisodeId, getSelectedStyle, getAssetImageModel, loadDrama, pollTask, pollUntilResourceHasImage, hasAssetImage })
 
 // ── Composable: Props ──────────────────────────────────
@@ -2451,6 +985,7 @@ const {
   loadPropLibraryList, debouncedLoadPropLibrary, openEditPropLibrary, submitEditPropLibrary,
   onDeletePropLibrary, onAddPropToLibrary, onAddPropToMaterialLibrary, onAddPropFromLibrary,
   doExtractFromRef2,
+  cleanup: cleanupProps,
 } = usePropsComposable({ store, dramaId, currentEpisodeId, getSelectedStyle, getAssetImageModel, loadDrama, pollTask, pollUntilResourceHasImage, hasAssetImage })
 
 // ── Composable: Scenes ─────────────────────────────────
@@ -2468,6 +1003,7 @@ const {
   loadSceneLibraryMembership, isSceneInLibrary, isSceneInMaterialLibrary,
   loadSceneLibraryList, debouncedLoadSceneLibrary, openEditSceneLibrary, submitEditSceneLibrary,
   onDeleteSceneLibrary, onAddSceneToLibrary, onAddSceneToMaterialLibrary, onAddSceneFromLibrary,
+  cleanup: cleanupScenes,
 } = useScenes({ store, dramaId, currentEpisodeId, getSelectedStyle, getAssetImageModel, scriptLanguage, loadDrama, pollTask, pollUntilResourceHasImage, hasAssetImage, dramaAPI })
 
 
@@ -2663,6 +1199,20 @@ const editingSbVideoPromptText = ref('')
 /** 正在编辑图片提示词的分镜 id（行内编辑，保留供内部 onSaveSbImagePrompt 使用） */
 const editingSbImagePromptId = ref(null)
 const editingSbImagePromptText = ref('')
+
+// ── Provide storyboard state for StoryboardSection inject ─────
+provide('storyboardSection', {
+  sbCharacterIds, sbPropIds, sbSceneId,
+  sbDialogue, sbNarration, sbShotType, sbTitle, sbLocation, sbTime, sbDuration,
+  sbAction, sbResult, sbAtmosphere, sbAngle, sbAngleH, sbAngleV, sbAngleS,
+  sbMovement, sbLighting, sbDof, sbCreationMode, sbUniversalSegmentText,
+  sbSelectedImgId, sbSelectedVideoId, sbVideoErrors,
+  editingSbVideoPromptId, editingSbVideoPromptText,
+  editingSbImagePromptId, editingSbImagePromptText,
+  sbDialogueAudioPaths, sbNarrationAudioPaths,
+  classicVideoPolishIds,
+})
+
 /** 分镜提示词弹窗 */
 const showSbPromptDialog = ref(false)
 const sbPromptTarget = ref(null)
@@ -2889,7 +1439,7 @@ async function doExtractFromRef(type) {
         ElMessage.success('已从参考图提取外貌描述')
       }
     } catch (e) {
-      ElMessage.error(e.message || '提取失败，请检查 AI 配置中是否有支持视觉的模型')
+      ElMessage.error(friendlyError(e))
     } finally {
       extractingCharAppearance.value = false
     }
@@ -2905,7 +1455,7 @@ async function doExtractFromRef(type) {
         ElMessage.success('已从参考图提取特征描述')
       }
     } catch (e) {
-      ElMessage.error(e.message || '提取失败，请检查 AI 配置中是否有支持视觉的模型')
+      ElMessage.error(friendlyError(e))
     } finally {
       extractingPropDesc.value = false
     }
@@ -2921,7 +1471,7 @@ async function doExtractFromRef(type) {
         ElMessage.success('已从参考图提取场景描述')
       }
     } catch (e) {
-      ElMessage.error(e.message || '提取失败，请检查 AI 配置中是否有支持视觉的模型')
+      ElMessage.error(friendlyError(e))
     } finally {
       extractingSceneDesc.value = false
     }
@@ -2975,22 +1525,6 @@ function imageUrl(url) {
   if (url.startsWith('http')) return url
   const base = (baseUrl.value || '').replace(/\/$/, '')
   return base ? base + '/' + url.replace(/^\//, '') : url
-}
-/** 优先使用本地地址，避免远程图失效。item 为 { image_url, local_path } 或字符串 url */
-function assetImageUrl(item) {
-  if (!item) return ''
-  if (typeof item === 'string') return imageUrl(item)
-  const localPath = item.local_path && String(item.local_path).trim()
-  if (localPath) {
-    const p = localPath.replace(/^\//, '')
-    return '/static/' + p
-  }
-  if (item.image_url) return imageUrl(item.image_url)
-  return ''
-}
-function hasAssetImage(item) {
-  if (!item) return false
-  return !!(item.image_url || item.local_path)
 }
 function getSelectedStyle() {
   return getSelectedStylePrompt()
@@ -3263,7 +1797,7 @@ async function onGenerateSbImage(sb) {
   } catch (e) {
     console.error(e)
     sb.errorMsg = e.message || '生成失败'
-    ElMessage.error(e.message || '生成失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     generatingSbImageIds.delete(sb.id)
   }
@@ -3301,7 +1835,7 @@ async function doUploadSbImage(sbId, file) {
     sbSelectedImgId.value = rest
     await loadSingleStoryboardMedia(sbId)
   } catch (e) {
-    ElMessage.error(e.message || '上传失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     uploadingSbImageId.value = null
   }
@@ -3419,7 +1953,10 @@ async function refreshLibraryMembership() {
   ])
 }
 
-async function loadDrama() {
+// loadDrama 请求去重：多个轮询同时触发时只发一次请求
+let _loadDramaPromise = null
+
+async function _doLoadDrama() {
   if (!store.dramaId) return
   try {
     let d = await dramaAPI.get(store.dramaId)
@@ -3457,7 +1994,17 @@ async function loadDrama() {
     syncStoryboardStateFromEpisode(ep)
     await loadStoryboardMedia()
   } catch (e) {
-    ElMessage.error(e.message || '加载失败')
+    ElMessage.error(friendlyError(e))
+  }
+}
+
+async function loadDrama() {
+  if (_loadDramaPromise) return _loadDramaPromise
+  _loadDramaPromise = _doLoadDrama()
+  try {
+    return await _loadDramaPromise
+  } finally {
+    _loadDramaPromise = null
   }
 }
 
@@ -3873,12 +2420,12 @@ async function executeGenerateStory(opts) {
         ElMessage.success(n > 1 ? `剧本已生成，共 ${n} 集，已默认选中第1集` : '剧本已生成并已保存')
       }
     } catch (e) {
-      ElMessage.error(e.message || '保存剧本失败')
+      ElMessage.error(friendlyError(e))
     } finally {
       scriptGenerating.value = false
     }
   } catch (e) {
-    ElMessage.error(e.message || '故事生成失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     storyGenerating.value = false
   }
@@ -3934,7 +2481,7 @@ async function onImportNovel() {
     showNovelImport.value = false
     novelImportReset()
   } catch (e) {
-    ElMessage.error(e.message || '导入失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     novelImporting.value = false
   }
@@ -3955,7 +2502,7 @@ async function onGenerateScript() {
       ElMessage.success('剧本已保存')
     }
   } catch (e) {
-    ElMessage.error(e.message || '保存失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     scriptGenerating.value = false
   }
@@ -3987,7 +2534,7 @@ async function onAddEpisode() {
     await loadDrama()
     ElMessage.success('已添加第' + nextNum + '集')
   } catch (e) {
-    ElMessage.error(e.message || '添加失败')
+    ElMessage.error(friendlyError(e))
   }
 }
 
@@ -4004,13 +2551,6 @@ function parseExtraImages(item) {
     const arr = typeof item.extra_images === 'string' ? JSON.parse(item.extra_images) : item.extra_images
     return Array.isArray(arr) ? arr.filter(Boolean) : []
   } catch { return [] }
-}
-
-// 将 local_path 转成可访问的 URL
-function localPathToUrl(p) {
-  if (!p) return ''
-  if (p.startsWith('http')) return p
-  return '/static/' + p.replace(/^\//, '')
 }
 
 // 查找角色/道具/场景在 store 中的当前对象
@@ -4061,7 +2601,7 @@ async function doUploadResourceImage(type, id, file) {
     await loadDrama()
     ElMessage.success('上传成功')
   } catch (e) {
-    ElMessage.error(e.message || '上传失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     uploadingResourceId.value = null
   }
@@ -4084,7 +2624,7 @@ async function onSetPrimaryImage(type, item, extraPath) {
     }
     await loadDrama()
   } catch (e) {
-    ElMessage.error(e.message || '操作失败')
+    ElMessage.error(friendlyError(e))
   }
 }
 
@@ -4102,7 +2642,7 @@ async function onRemoveExtraImage(type, item, extraPath) {
     }
     await loadDrama()
   } catch (e) {
-    ElMessage.error(e.message || '删除失败')
+    ElMessage.error(friendlyError(e))
   }
 }
 
@@ -4180,7 +2720,7 @@ async function onUpscaleSbImage(sb) {
     ElMessage.success('超分完成，图片已更新为高清版本')
     await loadSingleStoryboardMedia(sb.id)
   } catch (e) {
-    ElMessage.error(e.message || '超分辨率失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     upscalingSbIds.delete(sb.id)
   }
@@ -4264,7 +2804,7 @@ async function onTtsSbDialogue(sb) {
       ElMessage.success('配音已生成')
     }
   } catch (e) {
-    ElMessage.error(e.message || 'TTS 配音失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     ttsSbIds.delete(sb.id)
   }
@@ -4296,7 +2836,7 @@ async function onTtsSbNarration(sb) {
       ElMessage.success('解说配音已生成')
     }
   } catch (e) {
-    ElMessage.error(e.message || '解说 TTS 失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     ttsSbNarrationIds.delete(sb.id)
   }
@@ -4386,7 +2926,7 @@ async function onToggleSbUniversalMode(sb) {
     }
   } catch (e) {
     sbCreationMode.value = { ...sbCreationMode.value, [sb.id]: cur }
-    ElMessage.error(e.message || '保存失败')
+    ElMessage.error(friendlyError(e))
   }
 }
 
@@ -4477,7 +3017,7 @@ async function onGenerateUniversalSegmentPrompt(sb, opts = {}) {
     }
     ElMessage.success(force ? '已强制生成全能片段提示词（无图模式）' : '已根据分镜生成全能片段提示词')
   } catch (e) {
-    ElMessage.error(e.message || '生成失败，请检查文本模型配置')
+    ElMessage.error(friendlyError(e))
   } finally {
     generatingUniversalSegmentIds.delete(sb.id)
   }
@@ -4517,7 +3057,7 @@ async function onPolishClassicVideoPromptStream(sb, opts = {}) {
     if (row) row.video_prompt = text
     ElMessage.success('分镜视频提示词已润色并保存')
   } catch (e) {
-    ElMessage.error(e.message || '润色失败，请检查文本模型配置')
+    ElMessage.error(friendlyError(e))
   } finally {
     classicVideoPolishIds.delete(sb.id)
   }
@@ -4561,7 +3101,7 @@ async function onPolishUniversalSegmentPromptStream(sb, opts = {}) {
     }
     ElMessage.success(force ? '全能片段已强制润色并保存（无图模式）' : '全能片段提示词已润色并保存')
   } catch (e) {
-    ElMessage.error(e.message || '润色失败，请检查文本模型配置')
+    ElMessage.error(friendlyError(e))
   } finally {
     generatingUniversalSegmentIds.delete(sb.id)
   }
@@ -4655,7 +3195,7 @@ async function onGenerateSceneMultiView(scene) {
     }
     await loadDrama()
   } catch (e) {
-    ElMessage.error(e.message || '多视角生成失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     generatingSceneMultiViewIds.delete(scene.id)
   }
@@ -4809,7 +3349,7 @@ async function onPolishSbPrompt() {
       ElMessage.success('优化提示词已生成')
     }
   } catch (e) {
-    ElMessage.error(e.message || '生成失败，请检查文本模型配置')
+    ElMessage.error(friendlyError(e))
   } finally {
     sbPromptPolishing.value = false
   }
@@ -4829,7 +3369,7 @@ async function onSaveSbPromptDialog() {
     showSbPromptDialog.value = false
     ElMessage.success('提示词已保存')
   } catch (e) {
-    ElMessage.error(e.message || '保存失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     sbPromptSaving.value = false
   }
@@ -4843,7 +3383,7 @@ async function onSaveSbImagePrompt(sb) {
     editingSbImagePromptId.value = null
     ElMessage.success('图片提示词已保存')
   } catch (e) {
-    ElMessage.error(e.message || '保存失败')
+    ElMessage.error(friendlyError(e))
   }
 }
 
@@ -4934,7 +3474,7 @@ async function onSaveSbVideoFields(sb) {
     await loadDrama()
     ElMessage.success('已保存并更新视频提示词')
   } catch (e) {
-    ElMessage.error(e.message || '保存失败')
+    ElMessage.error(friendlyError(e))
   }
 }
 
@@ -4946,7 +3486,7 @@ async function onSaveSbVideoPrompt(sb) {
     editingSbVideoPromptId.value = null
     ElMessage.success('视频提示词已保存')
   } catch (e) {
-    ElMessage.error(e.message || '保存失败')
+    ElMessage.error(friendlyError(e))
   }
 }
 
@@ -4973,7 +3513,7 @@ async function onSaveVideoParams() {
     await onSaveSbVideoFields(sb)
     showVideoParamsDialog.value = false
   } catch (e) {
-    ElMessage.error(e.message || '保存失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     videoParamsSaving.value = false
   }
@@ -4987,7 +3527,7 @@ async function onBatchInferParams() {
     await loadDrama()
     ElMessage.success(`摄影参数推断完成，更新了 ${res?.updated ?? 0} 条分镜`)
   } catch (e) {
-    ElMessage.error(e.message || '推断失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     inferringParams.value = false
   }
@@ -5059,7 +3599,7 @@ async function onGenerateSbVideo(sb) {
     }
   } catch (e) {
     sbVideoErrors.value[sb.id] = e.message || '提交失败'
-    ElMessage.error(e.message || '提交失败')
+    ElMessage.error(friendlyError(e))
   } finally {
     generatingSbVideoIds.delete(sb.id)
     await loadSingleStoryboardMedia(sb.id)
@@ -5118,7 +3658,7 @@ async function onGenerateStoryboard() {
     )
   } catch (e) {
     // HTTP 错误由 request 拦截器统一展示，此处仅处理拦截器未覆盖的异常
-    if (!e.response) ElMessage.error(e.message || '生成失败')
+    if (!e.response) ElMessage.error(friendlyError(e))
   } finally {
     clearInterval(refreshTimer)
     storyboardGenerating.value = false
@@ -5144,7 +3684,7 @@ async function onAddSingleStoryboard(){
     ElMessage.success('添加成功')
     await loadDrama() // 刷新列表
   } catch (e) {
-    ElMessage.error(e.message || '添加失败')
+    ElMessage.error(friendlyError(e))
   }
 }
 
@@ -5160,7 +3700,7 @@ async function onDeleteSingleStoryboard(id){
     await loadDrama() // 刷新列表
   } catch (e) {
     if (e !== 'cancel') {
-      ElMessage.error(e.message || '删除失败')
+      ElMessage.error(friendlyError(e))
     }
   }
 }
@@ -5171,7 +3711,7 @@ async function onInsertStoryboardBefore(sb) {
     ElMessage.success('已在此位置前新增空白分镜')
     await loadDrama()
   } catch (e) {
-    ElMessage.error(e.message || '新增失败')
+    ElMessage.error(friendlyError(e))
   }
 }
 
@@ -5463,14 +4003,14 @@ function pollTask(taskId, onDone, opts = {}) {
         // 轮询网络异常时仅打印，不打断轮询（服务短暂重启等情况）
         console.warn('[pollTask] poll attempt failed:', pollErr?.message)
       }
-      if (attempts < maxAttempts) setTimeout(tick, interval)
+      if (attempts < maxAttempts) trackPollTimer(setTimeout(tick, interval))
       else {
         const timeoutMsg = `任务已超时（超过 ${timeoutMinutes} 分钟），请刷新页面查看是否已完成`
         ElMessage.warning(timeoutMsg)
         resolve({ status: 'timeout', error: timeoutMsg })
       }
     }
-    setTimeout(tick, interval)
+    trackPollTimer(setTimeout(tick, interval))
   })
 }
 
@@ -5504,12 +4044,12 @@ function pollTaskWithPause(taskId, onDone, opts = {}) {
       } catch (pollErr) {
         console.warn('[pollTaskWithPause] poll attempt failed:', pollErr?.message)
       }
-      if (attempts < maxAttempts) setTimeout(tick, interval)
+      if (attempts < maxAttempts) trackPollTimer(setTimeout(tick, interval))
       else {
         resolve({ error: `任务查询超时（超过 ${timeoutMinutes} 分钟）` })
       }
     }
-    setTimeout(tick, interval)
+    trackPollTimer(setTimeout(tick, interval))
   })
 }
 
@@ -6346,6 +4886,12 @@ async function runRepairPipeline() {
 
 
 onBeforeUnmount(() => {
+  // 清理 composable 中的轮询和防抖计时器
+  cleanupCharacters()
+  cleanupProps()
+  cleanupScenes()
+  // 取消所有未完成的 pollTask / pollTaskWithPause 轮询定时器
+  cancelAllPolls()
 })
 
 onMounted(() => {
@@ -6373,2303 +4919,4 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
-.film-create {
-  min-height: 100vh;
-  background: #09090b;
-  background-image:
-    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse 50% 40% at 85% 110%, rgba(56, 89, 209, 0.10) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(15, 15, 20, 0) 0%, #09090b 100%);
-  color: #e4e4e7;
-}
-html.light .film-create {
-  background: #f8f7ff;
-  background-image:
-    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse 50% 40% at 85% 110%, rgba(99, 102, 241, 0.06) 0%, transparent 50%);
-  color: #1e1b4b;
-}
-.header {
-  background: rgba(9, 9, 11, 0.75);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border-bottom: 1px solid rgba(139, 92, 246, 0.12);
-  padding: 10px 28px;
-  position: sticky;
-  top: 0;
-  z-index: 200;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.03), 0 4px 24px rgba(0, 0, 0, 0.4);
-  margin-left: 180px;
-  transition: margin-left 0.25s cubic-bezier(.4,0,.2,1);
-}
-.sidebar-collapsed .header {
-  margin-left: 48px;
-}
-html.light .header {
-  background: rgba(255, 255, 255, 0.82) !important;
-  border-bottom-color: rgba(139, 92, 246, 0.1) !important;
-  box-shadow: 0 1px 0 rgba(139,92,246,0.06), 0 4px 20px rgba(139, 92, 246, 0.05) !important;
-}
-.header-inner {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.logo {
-  margin: 0;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  line-height: 1;
-  transition: filter 0.3s;
-}
-.logo:hover { filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.5)); }
-.logo-main {
-  font-size: 1.05rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #e0d4fc 0%, #a78bfa 50%, #818cf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: -0.01em;
-}
-.logo-sub {
-  font-size: 0.65rem;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  color: #3f3f46;
-  -webkit-text-fill-color: #3f3f46;
-  text-transform: uppercase;
-}
-html.light .logo-main {
-  background: linear-gradient(135deg, #6d28d9, #4f46e5);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-html.light .logo-sub {
-  color: #9ca3af;
-  -webkit-text-fill-color: #9ca3af;
-}
-.breadcrumb-sep {
-  color: #27272a;
-  font-size: 0.9rem;
-  font-weight: 300;
-  flex-shrink: 0;
-  user-select: none;
-}
-html.light .breadcrumb-sep { color: #d1d5db; }
-.page-title {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: #71717a;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
-  padding: 4px 12px;
-  max-width: 220px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-html.light .page-title {
-  color: #6b7280;
-  background: rgba(99, 102, 241, 0.04);
-  border-color: rgba(99, 102, 241, 0.1);
-}
-.btn-back-drama {
-  flex-shrink: 0;
-}
-.header-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.btn-theme {
-  --el-button-bg-color: rgba(255, 255, 255, 0.04);
-  --el-button-border-color: rgba(255, 255, 255, 0.08);
-  --el-button-text-color: #71717a;
-  --el-button-hover-bg-color: rgba(255, 255, 255, 0.08);
-  --el-button-hover-border-color: rgba(139, 92, 246, 0.25);
-  --el-button-hover-text-color: #a78bfa;
-  transition: all 0.2s ease;
-}
-html.light .btn-theme {
-  --el-button-bg-color: rgba(99, 102, 241, 0.04);
-  --el-button-border-color: rgba(99, 102, 241, 0.12);
-  --el-button-text-color: #6b7280;
-  --el-button-hover-bg-color: rgba(99, 102, 241, 0.08);
-  --el-button-hover-border-color: rgba(99, 102, 241, 0.3);
-  --el-button-hover-text-color: #4f46e5;
-}
-/* ===== 左侧固定侧边栏 ===== */
-.quick-nav {
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 210;
-  display: flex;
-  flex-direction: column;
-  padding: 14px 0 10px;
-  background: linear-gradient(180deg, rgba(12, 12, 16, 0.98) 0%, rgba(9, 9, 11, 0.99) 100%);
-  backdrop-filter: blur(20px) saturate(1.3);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3);
-  border-right: 1px solid rgba(139, 92, 246, 0.1);
-  box-shadow: 1px 0 0 rgba(255,255,255,0.02), 4px 0 24px rgba(0, 0, 0, 0.3);
-  width: 180px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  transition: width 0.25s cubic-bezier(.4,0,.2,1), padding 0.25s cubic-bezier(.4,0,.2,1);
-}
-html.light .quick-nav {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 247, 255, 0.99) 100%);
-  border-right-color: rgba(139, 92, 246, 0.1);
-  box-shadow: 1px 0 0 rgba(139,92,246,0.06), 4px 0 20px rgba(139, 92, 246, 0.04);
-}
-.quick-nav::-webkit-scrollbar { width: 4px; }
-.quick-nav::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.25); border-radius: 4px; }
-.quick-nav::-webkit-scrollbar-track { background: transparent; }
-.quick-nav.collapsed {
-  width: 48px;
-  padding: 12px 0;
-}
-.quick-nav.collapsed .nav-steps,
-.quick-nav.collapsed .nav-group {
-  display: none;
-}
-@media (max-width: 768px) {
-  .quick-nav { width: 48px; padding: 12px 0; }
-  .quick-nav .nav-steps, .quick-nav .nav-group { display: none; }
-  .quick-nav .nav-sidebar-title { display: none; }
-  .quick-nav .nav-sidebar-header { justify-content: center; padding: 0 4px 8px; }
-  .header, .main { margin-left: 48px !important; }
-  .main { padding: 16px 12px 48px; }
-  .asset-list-two { grid-template-columns: 1fr; }
-}
-/* 当前任务面板 */
-.atp-panel {
-  margin-top: 6px;
-  border-top: 1px solid rgba(139, 92, 246, 0.18);
-  padding: 6px 0 4px;
-}
-.atp-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px 4px;
-}
-.atp-title {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #a78bfa;
-  letter-spacing: 0.03em;
-  flex: 1;
-}
-.atp-count-badge {
-  font-size: 0.68rem;
-  background: rgba(139, 92, 246, 0.25);
-  color: #c4b5fd;
-  border-radius: 8px;
-  padding: 1px 5px;
-  min-width: 16px;
-  text-align: center;
-}
-.atp-spin-dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #a78bfa;
-  flex-shrink: 0;
-  animation: atp-pulse 1.2s ease-in-out infinite;
-}
-@keyframes atp-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.75); }
-}
-.atp-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.atp-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: 6px;
-  transition: background 0.15s;
-}
-.atp-item:hover { background: rgba(255,255,255,0.05); }
-.atp-item-dot {
-  display: inline-block;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #7c3aed;
-  flex-shrink: 0;
-  animation: atp-pulse 1.6s ease-in-out infinite;
-}
-.atp-item-label {
-  font-size: 0.72rem;
-  color: #a1a1aa;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 118px;
-}
-.atp-more {
-  font-size: 0.68rem;
-  color: #71717a;
-  padding: 2px 10px 2px 19px;
-}
-/* 折叠态任务徽章 */
-.atp-collapsed-badge {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 4px 0;
-  cursor: default;
-}
-.atp-collapsed-count {
-  font-size: 0.65rem;
-  color: #a78bfa;
-  font-weight: 700;
-  line-height: 1;
-}
-html.light .atp-title { color: #7c3aed; }
-html.light .atp-count-badge { background: rgba(139,92,246,0.12); color: #7c3aed; }
-html.light .atp-spin-dot { background: #7c3aed; }
-html.light .atp-item-dot { background: #8b5cf6; }
-html.light .atp-item-label { color: #374151; }
-html.light .atp-item:hover { background: rgba(0,0,0,0.04); }
-html.light .atp-panel { border-top-color: rgba(139,92,246,0.15); }
-.nav-sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 10px 8px;
-  border-bottom: 1px solid rgba(139, 92, 246, 0.15);
-  margin-bottom: 8px;
-  flex-shrink: 0;
-}
-html.light .nav-sidebar-header { border-bottom-color: rgba(139, 92, 246, 0.12); }
-.quick-nav.collapsed .nav-sidebar-header {
-  justify-content: center;
-  padding: 0 4px 8px;
-}
-.nav-sidebar-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #a78bfa;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-  overflow: hidden;
-}
-html.light .nav-sidebar-title { color: #7c3aed; }
-.nav-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  cursor: pointer;
-  color: #71717a;
-  transition: color 0.15s, background 0.15s;
-  border-radius: 6px;
-  flex-shrink: 0;
-  font-size: 16px;
-}
-.nav-toggle:hover { color: #e4e4e7; background: rgba(255,255,255,0.08); }
-html.light .nav-toggle { color: #9ca3af; }
-html.light .nav-toggle:hover { color: #374151; background: rgba(0,0,0,0.05); }
-
-/* ─── Steps ─── */
-.nav-steps {
-  display: flex;
-  flex-direction: column;
-  padding: 0 10px 0 10px;
-}
-.nav-step {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  cursor: pointer;
-  border-radius: 6px;
-  padding: 3px 6px 3px 0;
-  transition: background 0.2s ease;
-  user-select: none;
-}
-.nav-step:hover { background: rgba(255,255,255,0.04); }
-html.light .nav-step:hover { background: rgba(99,102,241,0.05); }
-
-/* connector column */
-.step-connector-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 20px;
-  flex-shrink: 0;
-}
-.step-line {
-  width: 2px;
-  flex: 1;
-  min-height: 6px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 1px;
-  transition: background 0.3s;
-}
-html.light .step-line { background: rgba(0,0,0,0.1); }
-.step-line.filled { background: rgba(34, 197, 94, 0.5); }
-
-/* dot */
-.step-dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 700;
-  transition: all 0.25s;
-  border: 2px solid transparent;
-}
-.dot-pending {
-  background: rgba(39,39,42,0.6);
-  border-color: rgba(63,63,70,0.4);
-  color: #52525b;
-}
-html.light .dot-pending {
-  background: rgba(229,231,235,0.6);
-  border-color: rgba(156,163,175,0.3);
-  color: #9ca3af;
-}
-.dot-partial {
-  background: rgba(245, 158, 11, 0.12);
-  border-color: rgba(245, 158, 11, 0.45);
-  color: #f59e0b;
-}
-.dot-generating {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.5);
-  color: #a78bfa;
-  box-shadow: 0 0 8px rgba(139, 92, 246, 0.2);
-}
-.dot-done {
-  background: rgba(34, 197, 94, 0.12);
-  border-color: rgba(34, 197, 94, 0.5);
-  color: #22c55e;
-  box-shadow: 0 0 6px rgba(34, 197, 94, 0.15);
-}
-.dot-icon { font-size: 13px; }
-.dot-num { font-size: 11px; line-height: 1; }
-
-/* step body */
-.step-body {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-  padding: 3px 0;
-  min-width: 0;
-}
-.step-label {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 500;
-  color: #71717a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: color 0.2s ease;
-}
-html.light .step-label { color: #6b7280; }
-.nav-step:hover .step-label { color: #d4d4d8; }
-html.light .nav-step:hover .step-label { color: #1e1b4b; }
-.status-done .step-label { color: #6ee7b7; }
-html.light .status-done .step-label { color: #059669; }
-.status-generating .step-label { color: #c4b5fd; }
-html.light .status-generating .step-label { color: #7c3aed; }
-.status-partial .step-label { color: #fbbf24; }
-html.light .status-partial .step-label { color: #d97706; }
-
-.step-count {
-  font-size: 10px;
-  color: #52525b;
-  background: rgba(255,255,255,0.04);
-  border-radius: 10px;
-  padding: 1px 5px;
-  flex-shrink: 0;
-  font-weight: 500;
-}
-html.light .step-count { background: rgba(0,0,0,0.04); color: #9ca3af; }
-
-.step-badge {
-  display: flex;
-  align-items: center;
-  font-size: 11px;
-  flex-shrink: 0;
-}
-.partial-badge { color: #f59e0b; }
-.gen-badge { color: #a78bfa; }
-
-/* spin animation */
-@keyframes navSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-.spin { animation: navSpin 1s linear infinite; display: inline-flex; }
-
-/* sub-toggle & sub-list */
-.nav-group { margin-top: 4px; }
-.nav-sub-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  font-size: 12px;
-  color: #71717a;
-  cursor: pointer;
-  transition: color 0.15s;
-  border-top: 1px solid rgba(255,255,255,0.06);
-}
-html.light .nav-sub-toggle { border-top-color: rgba(0,0,0,0.07); color: #9ca3af; }
-.nav-sub-toggle:hover { color: #e4e4e7; }
-html.light .nav-sub-toggle:hover { color: #374151; }
-.nav-sub-list {
-  background: rgba(0,0,0,0.12);
-  padding: 4px 0;
-  border-radius: 0 0 6px 6px;
-}
-html.light .nav-sub-list { background: rgba(99,102,241,0.03); }
-.nav-sub-item {
-  padding: 4px 10px 4px 26px;
-  font-size: 11.5px;
-  color: #52525b;
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: color 0.15s, background 0.15s;
-  border-radius: 4px;
-  margin: 0 4px;
-}
-html.light .nav-sub-item { color: #9ca3af; }
-.nav-sub-item:hover { color: #d4d4d8; background: rgba(255,255,255,0.04); }
-html.light .nav-sub-item:hover { color: #1e1b4b; background: rgba(99,102,241,0.06); }
-
-.main {
-  margin-left: 180px;
-  margin-right: 0;
-  padding: 24px 32px 48px;
-  transition: margin-left 0.25s cubic-bezier(.4,0,.2,1);
-}
-.sidebar-collapsed .main {
-  margin-left: 48px;
-}
-.section {
-  margin-bottom: 24px;
-}
-.card {
-  background: rgba(17, 17, 21, 0.7);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
-  border-radius: 14px;
-  padding: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 4px 24px rgba(0, 0, 0, 0.2);
-  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
-}
-.card:hover {
-  border-color: rgba(139, 92, 246, 0.18);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 40px rgba(0, 0, 0, 0.3);
-}
-html.light .card {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
-  border-color: rgba(139, 92, 246, 0.08);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset, 0 4px 20px rgba(99, 102, 241, 0.05);
-}
-html.light .card:hover {
-  border-color: rgba(139, 92, 246, 0.18);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset, 0 8px 36px rgba(99, 102, 241, 0.08);
-}
-.section-title {
-  font-size: 1.05rem;
-  margin: 0 0 4px;
-  color: #f4f4f5;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-html.light .section-title { color: #1e1b4b; }
-.pipeline-section {
-  padding: 12px 16px !important;
-}
-.episode-sb-config-wrap {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--el-border-color-lighter);
-}
-.episode-sb-config-row {
-  margin-bottom: 8px;
-}
-.episode-pipeline-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 12px;
-}
-.one-click-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.one-click-label {
-  font-size: 14px;
-  color: var(--el-text-color-primary);
-  white-space: nowrap;
-  font-weight: 600;
-}
-.generate-story-mode-radios {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  width: 100%;
-}
-.generate-story-mode-radios :deep(.generate-story-mode-radio) {
-  margin-right: 0;
-  height: auto;
-  align-items: flex-start;
-  white-space: normal;
-}
-.generate-story-mode-radios :deep(.generate-story-mode-radio .el-radio__label) {
-  white-space: normal;
-  line-height: 1.45;
-}
-.pipeline-status {
-  margin-top: 12px;
-  padding: 12px;
-  background: var(--el-fill-color-light);
-  border-radius: 8px;
-  font-size: 13px;
-}
-.pipeline-current-step {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-  color: var(--el-text-color-primary);
-  font-weight: 500;
-  font-size: 13px;
-}
-.pipeline-step-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 44px;
-  padding: 1px 7px;
-  border-radius: 10px;
-  background: var(--el-color-primary);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.pipeline-active-tasks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-.pipeline-task-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 10px 2px 6px;
-  border-radius: 12px;
-  background: rgba(64, 158, 255, 0.12);
-  border: 1px solid rgba(64, 158, 255, 0.3);
-  color: var(--el-color-primary);
-  font-size: 12px;
-  white-space: nowrap;
-}
-.pipeline-task-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--el-color-primary);
-  flex-shrink: 0;
-  animation: pipeline-dot-pulse 1.2s ease-in-out infinite;
-}
-@keyframes pipeline-dot-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.75); }
-}
-.pipeline-error-log {
-  margin-top: 0;
-  padding: 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 8px;
-  font-size: 13px;
-  color: #fca5a5;
-  max-height: 200px;
-  overflow-y: auto;
-}
-.pipeline-status .pipeline-error-log {
-  margin-top: 8px;
-}
-.pipeline-error-title {
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-.pipeline-error-line {
-  margin-bottom: 4px;
-  word-break: break-all;
-}
-/* 阶段间倒计时 */
-.pipeline-countdown {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  margin: 10px 0 8px;
-  padding: 12px 14px;
-  background: rgba(103, 194, 58, 0.08);
-  border: 1px solid rgba(103, 194, 58, 0.35);
-  border-radius: 10px;
-}
-.pipeline-countdown-ring {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  background: rgba(103, 194, 58, 0.15);
-  border: 2px solid rgba(103, 194, 58, 0.6);
-  flex-shrink: 0;
-}
-.pipeline-countdown-num {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--el-color-success);
-  line-height: 1;
-}
-.pipeline-countdown-unit {
-  font-size: 11px;
-  color: var(--el-color-success);
-  opacity: 0.8;
-}
-.pipeline-countdown-body {
-  flex: 1;
-  min-width: 0;
-}
-.pipeline-countdown-msg {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: var(--el-text-color-primary);
-  line-height: 1.5;
-}
-.pipeline-countdown-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.pipeline-countdown-paused {
-  font-size: 12px;
-  color: var(--el-color-warning);
-}
-/* 批量生成分镜图/视频 */
-.sb-batch-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.sb-batch-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.batch-status {
-  margin-top: 12px;
-  padding: 12px 16px;
-  background: var(--el-fill-color-light);
-  border-radius: 8px;
-  font-size: 13px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.batch-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--el-text-color-primary);
-  font-weight: 500;
-}
-.batch-failed {
-  color: var(--el-color-danger);
-  font-size: 12px;
-}
-.batch-stopping {
-  color: var(--el-color-warning);
-  font-size: 12px;
-}
-.batch-error-log {
-  padding: 10px 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 6px;
-  font-size: 13px;
-  color: #fca5a5;
-  max-height: 160px;
-  overflow-y: auto;
-}
-.batch-error-title {
-  font-weight: 600;
-  margin-bottom: 6px;
-  color: #f87171;
-}
-.batch-error-line {
-  margin-bottom: 3px;
-  word-break: break-all;
-}
-/* 角色/场景 → 影响的分镜 */
-.asset-storyboard-link {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 8px;
-  padding: 6px 8px;
-  background: rgba(99, 102, 241, 0.07);
-  border: 1px solid rgba(99, 102, 241, 0.18);
-  border-radius: 6px;
-  min-height: 28px;
-}
-.asl-label {
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.asl-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 7px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 500;
-  background: rgba(99, 102, 241, 0.15);
-  border: 1px solid rgba(99, 102, 241, 0.35);
-  color: #a5b4fc;
-  cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s;
-  white-space: nowrap;
-}
-.asl-chip:hover {
-  background: rgba(99, 102, 241, 0.28);
-  box-shadow: 0 0 6px rgba(99, 102, 241, 0.4);
-  color: #c7d2fe;
-}
-.asl-regen-btn {
-  margin-left: auto !important;
-  flex-shrink: 0;
-  height: 22px !important;
-  padding: 0 10px !important;
-  font-size: 11px !important;
-  font-weight: 500 !important;
-  background: rgba(251, 146, 60, 0.15) !important;
-  border: 1px solid rgba(251, 146, 60, 0.5) !important;
-  color: #fb923c !important;
-  border-radius: 11px !important;
-  transition: background 0.15s, box-shadow 0.15s !important;
-}
-.asl-regen-btn:not(.is-loading):hover {
-  background: rgba(251, 146, 60, 0.28) !important;
-  box-shadow: 0 0 6px rgba(251, 146, 60, 0.35) !important;
-  color: #fdba74 !important;
-}
-.asl-progress {
-  font-size: 11px;
-  color: #fb923c;
-  margin-left: 4px;
-  flex-shrink: 0;
-}
-/* 参考图上传区（添加角色/道具/场景弹窗顶部） */
-.ref-image-zone {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.ref-image-box {
-  width: 120px;
-  height: 120px;
-  border: 2px dashed #c0c4cc;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  overflow: hidden;
-  background: #fafafa;
-  flex-shrink: 0;
-  transition: border-color 0.2s;
-}
-.ref-image-box:hover {
-  border-color: #409eff;
-}
-.ref-preview-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.ref-upload-hint {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  color: #909399;
-  font-size: 12px;
-  text-align: center;
-  padding: 8px;
-}
-.ref-upload-icon {
-  font-size: 28px;
-  line-height: 1;
-}
-.ref-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* 资源管理大面板 + 可折叠标题 */
-.resource-panel {
-  padding: 0;
-  overflow: hidden;
-}
-.collapse-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.2s;
-}
-.collapse-header:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-.resource-panel .collapse-header {
-  border-bottom: 1px solid #27272a;
-}
-.resource-panel .collapse-header .section-title {
-  margin: 0;
-}
-.collapse-icon {
-  font-size: 1.1rem;
-  color: #a1a1aa;
-  flex-shrink: 0;
-  margin-left: 8px;
-}
-.resource-panel-body {
-  padding: 16px 20px 20px;
-}
-.resource-block {
-  margin-bottom: 20px;
-  padding: 0;
-  overflow: hidden;
-}
-.resource-block:last-child {
-  margin-bottom: 0;
-}
-.resource-block-header {
-  padding: 10px 14px;
-  border-bottom: 1px solid #27272a;
-}
-.resource-block-header .collapse-icon {
-  font-size: 1rem;
-}
-.resource-block-title {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0;
-  color: #e4e4e7;
-}
-html.light .resource-block-title {
-  color: #18181b;
-}
-.resource-block-body {
-  padding: 12px 14px 14px;
-}
-.resource-block-body .asset-actions {
-  margin-bottom: 12px;
-}
-.resource-block-body .asset-list-two {
-  gap: 16px;
-}
-.section-desc {
-  color: #52525b;
-  font-size: 0.82rem;
-  margin: 0 0 14px;
-  line-height: 1.5;
-}
-html.light .section-desc { color: #6b7280; }
-.story-textarea {
-  margin-bottom: 12px;
-}
-.row { display: flex; flex-wrap: wrap; align-items: center; }
-.gap { gap: 12px; }
-.asset-actions { margin-bottom: 12px; }
-.asset-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 16px;
-}
-.asset-list-two {
-  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
-  gap: 20px;
-}
-.asset-item {
-  background: #27272a;
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.asset-item-left-right {
-  flex-direction: row;
-  align-items: stretch;
-}
-.asset-item-left-right .asset-info {
-  flex: 1;
-  min-width: 0;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-}
-.asset-item-left-right .asset-name {
-  font-size: 1.05rem;
-  margin-bottom: 8px;
-}
-.asset-item-left-right .asset-desc-full {
-  flex: 1;
-  font-size: 0.875rem;
-  color: #a1a1aa;
-  line-height: 1.5;
-  margin-bottom: 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.asset-item-left-right .asset-cover-wrap {
-  flex-shrink: 0;
-  align-self: flex-start;
-}
-.asset-item-left-right .asset-cover {
-  width: 200px;
-  height: 200px;
-}
-.asset-item-left-right .asset-cover.asset-cover--clickable {
-  cursor: pointer;
-}
-.asset-cover {
-  width: 100%;
-  aspect-ratio: 1;
-  background: #3f3f46;
-  position: relative;
-  overflow: hidden;
-}
-.asset-item-left-right .asset-cover .cover-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.cover-img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-}
-.cover-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #71717a;
-  font-size: 0.85rem;
-}
-.cover-placeholder.error {
-  background: #450a0a;
-  color: #f87171;
-  font-size: 0.8rem;
-  padding: 8px;
-  line-height: 1.4;
-  word-break: break-all;
-  text-align: center;
-}
-.sb-image-error {
-  width: 100%;
-  flex: 1;
-  background: #450a0a;
-  color: #f87171;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-  text-align: center;
-  font-size: 0.85rem;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-.asset-cover--dragover {
-  outline: 2px dashed var(--el-color-primary);
-  outline-offset: -2px;
-  background: rgba(64, 158, 255, 0.08);
-}
-.asset-cover-drop-hint {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  font-size: 0.9rem;
-  pointer-events: none;
-}
-.image-preview-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(0, 0, 0, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.image-preview-img {
-  max-width: 90vw;
-  max-height: 90vh;
-  object-fit: contain;
-  cursor: pointer;
-  pointer-events: auto;
-}
-.asset-info { padding: 10px; }
-.asset-name { font-weight: 600; margin-bottom: 4px; color: #e4e4e7; }
-.asset-desc {
-  font-size: 0.8rem;
-  color: #a1a1aa;
-  margin-bottom: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.asset-desc-full {
-  font-size: 0.875rem;
-  color: #a1a1aa;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.asset-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; align-items: center; }
-.sd2-cert-btn-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-  vertical-align: middle;
-}
-.sd2-help-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  margin-left: 1px;
-  color: #a78bfa;
-  cursor: help;
-  flex-shrink: 0;
-  border-radius: 50%;
-  outline: none;
-}
-.sd2-help-trigger:hover,
-.sd2-help-trigger:focus-visible {
-  color: #c4b5fd;
-  background: rgba(167, 139, 250, 0.12);
-}
-html.light .sd2-help-trigger { color: #7c3aed; }
-html.light .sd2-help-trigger:hover,
-html.light .sd2-help-trigger:focus-visible { color: #5b21b6; background: rgba(124, 58, 237, 0.1); }
-.sd2-mono { font-size: 12px; word-break: break-all; }
-.sd2-break { font-size: 12px; word-break: break-all; line-height: 1.4; }
-.sd2-break.muted { color: #a1a1aa; margin-top: 4px; }
-.sd2-doc-tip { font-size: 12px; color: #a1a1aa; margin-top: 12px; line-height: 1.5; }
-.sd2-doc-tip a { color: #c4b5fd; }
-html.light .sd2-doc-tip a { color: #5b21b6; }
-.asset-item-left-right .asset-name {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-}
-.asset-item-left-right .asset-name span { flex: 1; min-width: 0; }
-.btn-delete-icon { flex-shrink: 0; padding: 2px 4px !important; opacity: 0.45; transition: opacity 0.15s; }
-.btn-delete-icon:hover { opacity: 1; }
-/* 图片 + 操作按钮 竖向包裹 */
-.asset-cover-wrap {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  width: 200px;
-}
-.asset-cover-actions {
-  display: flex;
-  gap: 6px;
-  padding: 6px 8px;
-  border-top: 1px solid rgba(255,255,255,0.06);
-}
-.asset-cover-actions .el-button { flex: 1; justify-content: center; }
-html.light .asset-cover-actions { border-top-color: rgba(139,92,246,0.1); }
-/* 额外参考图缩略图条 */
-.extra-images-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 5px 8px;
-  background: rgba(0,0,0,0.15);
-}
-.extra-thumb {
-  position: relative;
-  width: 52px;
-  height: 52px;
-  border-radius: 4px;
-  overflow: hidden;
-  cursor: pointer;
-  border: 1.5px solid transparent;
-  transition: border-color 0.15s;
-}
-.extra-thumb:hover { border-color: #a78bfa; }
-.extra-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.extra-thumb-remove {
-  position: absolute;
-  top: 1px;
-  right: 1px;
-  width: 16px;
-  height: 16px;
-  background: rgba(239,68,68,0.85);
-  color: #fff;
-  border: none;
-  border-radius: 50%;
-  font-size: 11px;
-  line-height: 16px;
-  text-align: center;
-  cursor: pointer;
-  padding: 0;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.extra-thumb:hover .extra-thumb-remove { opacity: 1; }
-html.light .extra-images-strip { background: rgba(139,92,246,0.05); }
-.empty-tip {
-  color: #71717a;
-  font-size: 0.9rem;
-  padding: 16px 0;
-}
-
-/* 亮色模式：资源卡片 */
-html.light .asset-item {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(139, 92, 246, 0.12);
-  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.06);
-}
-html.light .asset-item:hover {
-  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.12);
-  border-color: rgba(139, 92, 246, 0.3);
-  transform: translateY(-2px);
-  transition: box-shadow 0.25s, transform 0.2s, border-color 0.25s;
-}
-html.light .asset-cover {
-  background: #f3f4f6;
-}
-html.light .asset-name {
-  color: #18181b;
-}
-html.light .asset-desc,
-html.light .asset-desc-full,
-html.light .asset-item-left-right .asset-desc-full {
-  color: #6b7280;
-}
-html.light .cover-placeholder {
-  color: #9ca3af;
-  background: #f3f4f6;
-}
-html.light .cover-placeholder.error {
-  background: #fef2f2;
-  color: #dc2626;
-}
-html.light .empty-tip {
-  color: #9ca3af;
-}
-
-/* 分镜：每行一个，三列布局 */
-@keyframes sb-fade-in {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-/* ── 段落分隔标头 ─────────────────────────────── */
-.segment-header {
-  margin: 24px 0 14px;
-  position: relative;
-}
-.segment-header:first-child { margin-top: 0; }
-.segment-header-inner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 18px;
-  background: linear-gradient(90deg, rgba(139,92,246,0.12) 0%, transparent 80%);
-  border-left: 3px solid rgba(139,92,246,0.6);
-  border-radius: 0 10px 10px 0;
-}
-.segment-index-badge {
-  font-size: 11px;
-  font-weight: 600;
-  color: #a78bfa;
-  background: rgba(139,92,246,0.15);
-  padding: 2px 8px;
-  border-radius: 20px;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
-}
-.segment-title-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: #d4d4d8;
-  flex: 1;
-  letter-spacing: -0.01em;
-}
-.segment-shot-range {
-  font-size: 11px;
-  color: #52525b;
-  white-space: nowrap;
-}
-html.light .segment-header-inner {
-  background: linear-gradient(90deg, rgba(139,92,246,0.07) 0%, transparent 80%);
-  border-left-color: rgba(124,58,237,0.5);
-}
-html.light .segment-title-text { color: #1e1b4b; }
-html.light .segment-index-badge { color: #7c3aed; background: rgba(124,58,237,0.08); }
-html.light .segment-shot-range { color: #9ca3af; }
-
-/* 左侧导航段落标签 */
-.nav-segment-label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px 2px;
-  font-size: 10px;
-  font-weight: 700;
-  color: #a78bfa;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-.nav-segment-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #8b5cf6;
-  flex-shrink: 0;
-}
-
-.storyboard-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0;
-  margin-bottom: 16px;
-  background: rgba(17, 17, 21, 0.65);
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  overflow: hidden;
-  position: relative;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
-  animation: sb-fade-in 0.35s ease both;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset, 0 2px 12px rgba(0, 0, 0, 0.15);
-}
-.storyboard-row:hover {
-  border-color: rgba(139, 92, 246, 0.2);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset, 0 6px 28px rgba(0, 0, 0, 0.25);
-  transform: translateY(-1px);
-}
-html.light .storyboard-row {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(139, 92, 246, 0.06);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.7) inset, 0 2px 12px rgba(99, 102, 241, 0.04);
-}
-html.light .storyboard-row:hover {
-  border-color: rgba(139, 92, 246, 0.18);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.7) inset, 0 6px 24px rgba(99, 102, 241, 0.08);
-  transform: translateY(-1px);
-}
-.storyboard-row:last-child { margin-bottom: 0; }
-/* ── 分镜控制栏（卡片外，缩进） ── */
-.sb-ctrl-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 32px;
-  margin-bottom: 4px;
-  height: 26px;
-}
-.sb-ctrl-num {
-  background: var(--el-color-primary);
-  color: #fff;
-  border-radius: 5px;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.sb-ctrl-title {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #e4e4e7;
-  max-width: 12em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-html.light .sb-ctrl-title {
-  color: #000;
-}
-.sb-ctrl-btn.el-button {
-  height: 22px;
-  padding: 0 8px;
-  font-size: 11px;
-}
-.sb-ctrl-config-btn.el-button {
-  border-color: rgba(139,92,246,0.45);
-  color: #a78bfa;
-  background: rgba(139,92,246,0.08);
-}
-.sb-ctrl-config-btn.el-button:hover {
-  border-color: #8b5cf6;
-  color: #fff;
-  background: rgba(139,92,246,0.6);
-}
-html.light .sb-ctrl-config-btn.el-button {
-  border-color: rgba(124,58,237,0.35);
-  color: #7c3aed;
-  background: rgba(124,58,237,0.06);
-}
-html.light .sb-ctrl-config-btn.el-button:hover {
-  border-color: #7c3aed;
-  color: #fff;
-  background: #7c3aed;
-}
-.sb-ctrl-delete {
-  margin-left: auto;
-  opacity: 0.4;
-  transition: opacity 0.2s;
-  height: 22px;
-  padding: 0 4px;
-}
-.sb-ctrl-bar:hover .sb-ctrl-delete {
-  opacity: 1;
-}
-.sb-panel {
-  flex: 1;
-  min-width: 0;
-  padding: 14px 16px;
-  border-right: 1px solid rgba(255,255,255,0.05);
-  display: flex;
-  flex-direction: column;
-}
-html.light .sb-panel {
-  border-right-color: rgba(139,92,246,0.08);
-}
-.sb-panel:last-child { border-right: none; }
-.sb-panel-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #e4e4e7;
-  margin-bottom: 10px;
-}
-.sb-panel-title .el-icon { font-size: 1rem; color: #a1a1aa; }
-.sb-panel-title-name {
-  margin-left: 4px;
-  color: #a1a1aa;
-  font-weight: 500;
-  max-width: 12em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sb-script { padding-top: 10px; }
-.sb-script-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.sb-select { flex: 1; min-width: 0; }
-.sb-select-empty { font-size: 0.8rem; color: #71717a; padding: 8px; }
-.sb-selected-thumbs {
-  margin: 10px 0;
-  padding: 8px 0;
-  border-top: 1px solid #27272a;
-}
-.sb-thumb-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.sb-thumb-row:last-child { margin-bottom: 0; }
-.sb-thumb-label {
-  font-size: 0.8rem;
-  color: #71717a;
-  flex-shrink: 0;
-  width: 36px;
-}
-.sb-thumb-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-.sb-thumb-item {
-  flex-shrink: 0;
-  border-radius: 6px;
-  overflow: hidden;
-  background: #27272a;
-}
-.sb-thumb-item.sb-thumb-clickable {
-  cursor: pointer;
-}
-.sb-thumb-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-}
-.sb-thumb-add-char {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border: 1.5px dashed #52525b;
-  background: transparent;
-  color: #a1a1aa;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-.sb-thumb-add-char:hover {
-  color: #e4e4e7;
-  border-color: #71717a;
-  background: rgba(63, 63, 70, 0.5);
-}
-html.light .sb-thumb-add-char {
-  border-color: #d4d4d8;
-  color: #71717a;
-}
-html.light .sb-thumb-add-char:hover {
-  color: #18181b;
-  border-color: #a1a1aa;
-  background: #f4f4f5;
-}
-.sb-thumb-prop,
-.sb-thumb-scene {
-  width: 36px;
-  height: 36px;
-}
-.sb-script-row.sb-script-selects {
-  gap: 6px;
-}
-.sb-script-row.sb-script-selects .sb-select {
-  min-width: 0;
-}
-.sb-script-row.sb-script-selects .el-select { flex: 1; min-width: 0; }
-.sb-thumb-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.sb-thumb-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  color: #a1a1aa;
-  background: #3f3f46;
-}
-.sb-script-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  color: #71717a;
-  margin-bottom: 6px;
-}
-.sb-script-label .el-icon { font-size: 0.9rem; }
-.sb-upload-icon { margin-left: auto; cursor: pointer; color: #a1a1aa; }
-.sb-meta {
-  font-size: 0.75rem;
-  color: #71717a;
-  display: flex;
-  gap: 12px;
-}
-.sb-image-area {
-  flex: 1;
-  min-height: 200px;
-  max-height: 320px;
-  background: linear-gradient(145deg, #18181b 0%, #1f1f23 60%, #1a1a1f 100%);
-  border: 1px dashed rgba(139,92,246,0.22);
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  overflow: hidden;
-  position: relative;
-  transition: border-color 0.2s, background 0.2s;
-}
-.sb-image-area:hover {
-  border-color: rgba(139,92,246,0.45);
-}
-html.light .sb-image-area {
-  background: linear-gradient(145deg, #f5f3ff 0%, #ede9fe 100%);
-  border-color: rgba(124,58,237,0.2);
-}
-html.light .sb-image-area:hover {
-  border-color: rgba(124,58,237,0.45);
-}
-.sb-image-area--dragover {
-  outline: 2px dashed var(--el-color-primary);
-  outline-offset: -2px;
-  background: rgba(64, 158, 255, 0.1);
-}
-.sb-image-area-drop-hint {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  font-size: 0.9rem;
-  border-radius: 8px;
-  pointer-events: none;
-}
-.sb-generated-img {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  border-radius: 8px;
-}
-.sb-image-file-input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
-.sb-gen-btn { margin-top: 4px; }
-.sb-image-area img.sb-generated-img { cursor: pointer; }
-.sb-panel.sb-image.sb-image--universal {
-  min-height: 300px;
-  justify-content: flex-start;
-}
-.sb-universal-label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  width: 100%;
-}
-.sb-universal-label-left {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.sb-universal-hint-icon {
-  cursor: help;
-  color: #9ca3af;
-  font-size: 16px;
-  flex-shrink: 0;
-}
-.sb-universal-hint-icon:hover {
-  color: #a78bfa;
-}
-.sb-universal-gen-btn {
-  flex-shrink: 0;
-}
-.sb-universal-prompt-dd {
-  flex-shrink: 0;
-}
-.sb-universal-dd-caret {
-  margin-left: 2px;
-  font-size: 12px;
-  vertical-align: middle;
-}
-:global(.sb-universal-tooltip-popper.el-popper) {
-  padding: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-.sb-universal-tooltip {
-  max-width: 360px;
-  font-size: 12px;
-  line-height: 1.55;
-  padding: 10px 12px;
-  border-radius: 8px;
-  color: #f1f5f9;
-  background: #0f172a;
-  border: 1px solid rgba(248, 250, 252, 0.22);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-}
-.sb-universal-tooltip strong {
-  font-weight: 600;
-  color: #ffffff;
-}
-html.light .sb-universal-tooltip {
-  color: #0f172a;
-  background: #ffffff;
-  border-color: #cbd5e1;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
-}
-html.light .sb-universal-tooltip strong {
-  color: #020617;
-}
-.sb-universal-textarea {
-  flex: 1;
-  min-height: 0;
-}
-.sb-universal-textarea :deep(.el-textarea__inner) {
-  min-height: 220px !important;
-  font-size: 13px;
-  line-height: 1.55;
-}
-.vp-mode-hint {
-  font-size: 12px;
-  color: #909399;
-  line-height: 1.45;
-  margin-top: 8px;
-  max-width: 520px;
-}
-.sb-ctrl-mode-btn.el-button {
-  border-color: rgba(34, 197, 94, 0.35);
-  color: #86efac;
-  background: rgba(34, 197, 94, 0.08);
-}
-.sb-ctrl-mode-btn.el-button:hover {
-  border-color: #22c55e;
-  color: #fff;
-  background: rgba(34, 197, 94, 0.45);
-}
-html.light .sb-ctrl-mode-btn.el-button {
-  border-color: rgba(22, 163, 74, 0.35);
-  color: #15803d;
-  background: rgba(22, 163, 74, 0.06);
-}
-html.light .sb-ctrl-mode-btn.el-button:hover {
-  border-color: #16a34a;
-  color: #fff;
-  background: #16a34a;
-}
-/* 有四宫格或多图时，image-area 改为纵向滚动布局 */
-.sb-image-area--has-quad {
-  flex-direction: column;
-  align-items: stretch;
-  overflow-y: auto;
-  max-height: 340px;
-}
-/* 普通多图缩略图条 */
-.sb-imgs-strip {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-  padding: 6px 8px 4px;
-  overflow-x: auto;
-  border-top: 1px solid var(--el-border-color-lighter);
-  flex-shrink: 0;
-}
-.sb-strip-hint-icon {
-  font-size: 12px;
-  color: var(--el-text-color-placeholder);
-  cursor: default;
-  transition: color 0.15s;
-}
-.sb-strip-hint-icon:hover {
-  color: var(--el-color-primary);
-}
-.sb-img-thumb {
-  position: relative;
-  cursor: pointer;
-  border-radius: 4px;
-  overflow: hidden;
-  border: 2px solid transparent;
-  transition: border-color 0.2s;
-  flex-shrink: 0;
-  width: 52px;
-  height: 52px;
-}
-.sb-img-thumb:hover { border-color: var(--el-color-primary); }
-.sb-img-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.sb-img-thumb-label {
-  position: absolute;
-  bottom: 1px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 10px;
-  color: #fff;
-  background: rgba(0,0,0,0.45);
-  pointer-events: none;
-}
-/* 主图容器 */
-.sb-main-image-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 80px;
-}
-/* 主图下方提示词预览 */
-.sb-main-img-prompt {
-  width: 100%;
-  font-size: 10px;
-  color: var(--el-text-color-secondary);
-  background: var(--el-fill-color-lighter);
-  border-top: 1px solid var(--el-border-color-lighter);
-  padding: 4px 6px;
-  line-height: 1.4;
-  max-height: 48px;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  word-break: break-all;
-  cursor: default;
-}
-/* 四宫格整图作为上方预览时稍微缩小 */
-.sb-quad-preview { max-height: 160px; }
-/* 四宫格拆分中占位 */
-.quad-splitting-tip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  padding: 8px;
-}
-.sb-image-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-  flex-shrink: 0;
-  padding-top: 6px;
-}
-.sb-video-area {
-  flex: 1;
-  min-height: 200px;
-  background: linear-gradient(145deg, #18181b 0%, #1f1f23 60%, #1a1a1f 100%);
-  border: 1px dashed rgba(139,92,246,0.22);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: border-color 0.2s;
-}
-html.light .sb-video-area {
-  background: linear-gradient(145deg, #f5f3ff 0%, #ede9fe 100%);
-  border-color: rgba(124,58,237,0.2);
-}
-.sb-video-placeholder {
-  color: #71717a;
-  font-size: 0.9rem;
-  flex-direction: column;
-  gap: 10px;
-  text-align: center;
-  padding: 16px;
-}
-html.light .sb-video-placeholder {
-  color: #7c3aed;
-}
-.sb-video-generating-text {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #409eff;
-  font-size: 0.85rem;
-}
-.sb-video-error {
-  color: #f56c6c;
-  font-size: 0.75rem;
-  line-height: 1.4;
-  word-break: break-word;
-  max-height: 80px;
-  overflow-y: auto;
-  padding: 4px 8px;
-  background: rgba(245, 108, 108, 0.08);
-  border-radius: 4px;
-  text-align: left;
-  width: 100%;
-}
-.sb-video-player {
-  width: 100%;
-  max-height: 240px;
-  border-radius: 8px;
-}
-.sb-video-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-  flex-shrink: 0;
-  padding-top: 6px;
-}
-.sb-video-regenerating-overlay {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 6px;
-  font-size: 0.82rem;
-  color: #a78bfa;
-}
-.sb-videos-strip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-.sb-video-thumb {
-  position: relative;
-  width: 72px;
-  height: 48px;
-  border-radius: 5px;
-  overflow: hidden;
-  cursor: pointer;
-  border: 1.5px solid transparent;
-  flex-shrink: 0;
-  transition: border-color 0.15s;
-}
-.sb-video-thumb:hover {
-  border-color: #a855f7;
-}
-.sb-video-thumb-player {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  pointer-events: none;
-}
-.sb-video-thumb-label {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0,0,0,0.55);
-  color: #e4e4e7;
-  font-size: 0.65rem;
-  text-align: center;
-  padding: 1px 0;
-  pointer-events: none;
-}
-.sb-video-prompt-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.sb-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #a855f7;
-  flex-shrink: 0;
-}
-.sb-video-prompt-label > span:not(.sb-dot) { font-size: 0.85rem; color: #e4e4e7; }
-.sb-video-params-bar {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 4px 0;
-}
-.sb-video-params-bar .sb-video-prompt-text {
-  flex: 1;
-  min-width: 0;
-}
-.sb-video-prompt-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.sb-video-prompt-row .sb-video-prompt-text {
-  flex: 1;
-  min-width: 0;
-}
-.vp-dialog-form .el-form-item {
-  margin-bottom: 12px;
-}
-.sb-video-prompt-text {
-  font-size: 0.85rem;
-  color: #a1a1aa;
-  line-height: 1.5;
-  padding: 8px 0;
-}
-.sb-video-prompt-text--preview {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-all;
-}
-.sb-video-prompt-edit {
-  margin-bottom: 8px;
-}
-.sb-video-prompt-edit .el-textarea { margin-bottom: 8px; }
-.sb-video-prompt-edit-actions { display: flex; gap: 8px; }
-.sb-generate-video-btn { margin-top: 8px; }
-.sb-prompt-label { display: flex; align-items: center; gap: 8px; margin: 10px 0 6px; }
-.sb-prompt-label .sb-dot { flex-shrink: 0; }
-.sb-prompt-label > span:not(.sb-dot) { font-size: 0.85rem; color: #e4e4e7; }
-.sb-prompt-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
-.sb-prompt-row .sb-prompt-text { flex: 1; min-width: 0; font-size: 0.85rem; color: #a1a1aa; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.sb-image-prompt-edit .el-textarea { margin-bottom: 6px; }
-.sb-prompt-edit-actions { display: flex; gap: 8px; }
-.sb-video-fields-collapse { margin: 8px 0; }
-.sb-video-fields-collapse .el-collapse-item__header { font-size: 0.9rem; }
-.sb-prompt-section-title { font-size: 0.9rem; font-weight: 600; color: #e4e4e7; margin-bottom: 8px; }
-.sb-prompt-video-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.sb-prompt-dialog-form .el-form-item { margin-bottom: 10px; }
-.sb-collapse-title { color: #a1a1aa; }
-.sb-video-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; padding: 8px 0; }
-.sb-field { display: flex; flex-direction: column; gap: 4px; }
-.sb-field-full { grid-column: 1 / -1; }
-.sb-field-label { font-size: 0.8rem; color: #a1a1aa; }
-.sb-field-select { width: 100%; }
-.sb-video-fields-actions { grid-column: 1 / -1; margin-top: 8px; }
-.config-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px 24px;
-  margin-bottom: 16px;
-}
-.video-option-hint {
-  flex: 1;
-  min-width: 200px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--el-text-color-secondary);
-}
-.video-option-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 10px 12px;
-}
-.video-watermark-input {
-  flex: 1;
-  min-width: 200px;
-  max-width: 360px;
-}
-.config-tip {
-  margin: 12px 0 0;
-  font-size: 0.9rem;
-  color: #a1a1aa;
-}
-.config-tip .el-link { font-size: inherit; }
-.sb-truncated-warning {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  margin-bottom: 14px;
-  background: rgba(234, 179, 8, 0.12);
-  border: 1px solid rgba(234, 179, 8, 0.4);
-  border-radius: 8px;
-  color: #fbbf24;
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-.sb-truncated-warning .el-icon {
-  flex-shrink: 0;
-  font-size: 1rem;
-  color: #fbbf24;
-}
-.sb-truncated-warning span {
-  flex: 1;
-}
-/* 分镜生成中提示条 */
-.sb-generating-tip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 12px 18px;
-  margin-top: 10px;
-  background: rgba(139, 92, 246, 0.08);
-  border: 1px dashed rgba(139, 92, 246, 0.35);
-  border-radius: 10px;
-  color: #a78bfa;
-  font-size: 0.9rem;
-}
-.sb-gen-text {
-  flex: 1;
-  letter-spacing: 0.03em;
-}
-.sb-gen-dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #a78bfa;
-  animation: sb-dot-bounce 1.2s infinite ease-in-out both;
-}
-.sb-gen-dot:nth-child(1) { animation-delay: 0s; }
-.sb-gen-dot:nth-child(2) { animation-delay: 0.2s; }
-.sb-gen-dot:nth-child(3) { animation-delay: 0.4s; }
-@keyframes sb-dot-bounce {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
-  40%            { transform: scale(1);   opacity: 1;   }
-}
-.sb-config-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-}
-.sb-config-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.sb-config-label {
-  font-size: 0.85rem;
-  color: #a1a1aa;
-  white-space: nowrap;
-}
-.sb-config-input {
-  width: 110px;
-}
-.sb-config-hint {
-  font-size: 0.78rem;
-  color: #52525b;
-  white-space: nowrap;
-}
-.sb-config-hint--estimate {
-  white-space: normal;
-  max-width: 220px;
-  line-height: 1.35;
-}
-.sb-config-divider {
-  color: #3f3f46;
-  font-size: 0.85rem;
-  margin: 0 4px;
-}
-/* 解说导出行：避免浅色主题下勾选文案与卡片背景对比度不足 */
-.sb-narration-export-row :deep(.el-checkbox__label) {
-  color: #e4e4e7;
-  font-size: 0.875rem;
-  line-height: 1.45;
-}
-html.light .sb-narration-export-row :deep(.el-checkbox__label) {
-  color: #374151;
-}
-.sb-export-srt-btn.el-button--primary.is-plain {
-  --el-button-bg-color: rgba(124, 58, 237, 0.75);
-  --el-button-border-color: #a78bfa;
-  --el-button-text-color: #fff;
-  --el-button-hover-text-color: #fff;
-  --el-button-hover-bg-color: #8b5cf6;
-  --el-button-hover-border-color: #c4b5fd;
-}
-html.light .sb-export-srt-btn.el-button--primary.is-plain {
-  --el-button-bg-color: #7c3aed;
-  --el-button-border-color: #6d28d9;
-  --el-button-text-color: #fff;
-  --el-button-hover-text-color: #fff;
-  --el-button-hover-bg-color: #6d28d9;
-  --el-button-hover-border-color: #5b21b6;
-}
-.sb-narration-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-}
-/* 分镜内解说旁白输入框：强制字/底对比，避免主题变量与页面继承冲突导致「看不见字」 */
-.sb-narration-input :deep(.el-textarea__inner) {
-  color: #e4e4e7 !important;
-  background-color: rgba(24, 24, 27, 0.85) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
-  box-shadow: none;
-}
-.sb-narration-input :deep(.el-textarea__inner::placeholder) {
-  color: #71717a !important;
-}
-html.light .sb-narration-input :deep(.el-textarea__inner) {
-  color: #1e1b4b !important;
-  background-color: #ffffff !important;
-  border-color: rgba(139, 92, 246, 0.22) !important;
-}
-html.light .sb-narration-input :deep(.el-textarea__inner::placeholder) {
-  color: #9ca3af !important;
-}
-.sub-title {
-  font-size: 1rem;
-  margin: 16px 0 8px;
-  color: #e4e4e7;
-}
-.video-progress, .video-done, .video-error {
-  margin-top: 16px;
-}
-.video-preview-wrap {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid #27272a;
-}
-.video-preview-label {
-  margin: 0 0 10px;
-  font-size: 0.95rem;
-  color: #a1a1aa;
-}
-.video-preview-player {
-  display: block;
-  max-width: 100%;
-  max-height: 360px;
-  border-radius: 8px;
-  background: #18181b;
-}
-
-/* 公共库弹窗 */
-.library-dialog .el-dialog__body { padding-top: 8px; }
-.library-toolbar { margin-bottom: 12px; }
-.library-list {
-  min-height: 200px;
-  max-height: 420px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.library-item {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  padding: 10px;
-  background: #27272a;
-  border-radius: 8px;
-}
-.library-item-cover {
-  width: 72px;
-  height: 72px;
-  flex-shrink: 0;
-  background: #3f3f46;
-  border-radius: 6px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.library-item-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.library-item-placeholder {
-  font-size: 0.8rem;
-  color: #71717a;
-}
-.library-item-info { flex: 1; min-width: 0; }
-.library-item-name { font-weight: 500; margin-bottom: 4px; }
-.library-item-desc { font-size: 0.85rem; color: #a1a1aa; margin-bottom: 8px; }
-.library-item-actions { display: flex; gap: 8px; }
-.library-empty {
-  text-align: center;
-  color: #71717a;
-  padding: 40px 20px;
-}
-.library-pagination {
-  margin-top: 12px;
-  display: flex;
-  justify-content: center;
-}
-.library-placeholder {
-  padding: 40px 20px;
-  text-align: center;
-  color: #71717a;
-}
-</style>
-
-<style>
-/* SD2 说明 tooltip（挂载在 body，需非 scoped） */
-.sd2-cert-tooltip {
-  max-width: min(360px, 92vw);
-  line-height: 1.55;
-  font-size: 13px;
-}
-.sd2-cert-tooltip .sd2-tooltip-inner { padding: 2px 0; }
-.sd2-cert-tooltip .sd2-tooltip-status {
-  font-weight: 600;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-}
-.sd2-cert-tooltip .sd2-tooltip-p { margin: 0 0 8px; }
-.sd2-cert-tooltip .sd2-tooltip-p:last-child { margin-bottom: 0; }
-.sd2-cert-tooltip .sd2-tooltip-p--muted { font-size: 12px; opacity: 0.92; }
-.sd2-cert-tooltip a { color: #93c5fd; text-decoration: underline; }
-html.light .sd2-cert-tooltip .sd2-tooltip-status {
-  border-bottom-color: rgba(0, 0, 0, 0.1);
-}
-html.light .sd2-cert-tooltip a { color: #2563eb; }
-</style>
+<style src="@/styles/film-create.scss" lang="scss"></style>

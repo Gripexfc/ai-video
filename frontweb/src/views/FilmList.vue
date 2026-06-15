@@ -3,8 +3,8 @@
     <header class="header">
       <div class="header-inner">
         <h1 class="logo">
-          <span class="logo-main">本地短剧助手</span>
-          <span class="logo-sub">LocalMiniDrama</span>
+          <img src="/logo.png" class="logo-icon" alt="logo" />
+          <span class="logo-main">视频miao~</span>
         </h1>
         <!-- 公共资源库（左侧，靛紫调） -->
         <div class="header-library">
@@ -20,6 +20,22 @@
         </div>
         <!-- 右侧操作区 -->
         <div class="header-actions">
+          <!-- 用户信息 + 积分余额 -->
+          <el-button class="btn-credits" @click="showCreditsDialog = true">
+            <el-icon><Coin /></el-icon>积分: {{ userCredits }}
+          </el-button>
+          <el-dropdown @command="onUserCommand">
+            <el-button class="btn-user">
+              <el-icon><User /></el-icon>{{ userName }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="credits">积分中心</el-dropdown-item>
+                <el-dropdown-item command="password">修改密码</el-dropdown-item>
+                <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <!-- 暂时隐藏，功能待完善 -->
           <!-- <el-button class="btn-library" title="自由创作" @click="$router.push('/free-create')">
             <el-icon><MagicStick /></el-icon>自由创作
@@ -27,16 +43,17 @@
           <el-button class="btn-library" title="媒体素材库" @click="$router.push('/media-library')">
             <el-icon><Files /></el-icon>素材库
           </el-button> -->
-          <el-button v-if="!vendorLockEnabled" class="btn-wechat" title="扫码联系作者" @click="showWechat = true">
-            <el-icon><ChatDotSquare /></el-icon>微信我
+          <el-button class="btn-help" title="使用帮助" @click="showHelp = true">
+            <el-icon><QuestionFilled /></el-icon>帮助
           </el-button>
           <el-button class="btn-theme" :title="isDark ? '切换到浅色模式' : '切换到暗色模式'" @click="toggleTheme">
             <el-icon><Sunny v-if="isDark" /><Moon v-else /></el-icon>
             {{ isDark ? '浅色' : '暗色' }}
           </el-button>
-          <el-button class="btn-settings" @click="showAiConfigDialog = true">
+          <!-- AI配置：积分模式下由管理员统一配置，普通用户不显示 -->
+          <!-- <el-button class="btn-settings" @click="showAiConfigDialog = true">
             <el-icon><Setting /></el-icon>AI配置
-          </el-button>
+          </el-button> -->
           <el-button class="btn-import" :loading="importing" @click="triggerImport">
             <el-icon><Upload /></el-icon>导入项目
           </el-button>
@@ -49,6 +66,16 @@
     </header>
 
     <main class="main">
+      <div class="search-bar" v-if="dramasRich.length > 0 || searchKeyword">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索项目..."
+          clearable
+          class="search-input"
+          @clear="loadList"
+          @input="debouncedSearch"
+        />
+      </div>
       <div v-loading="loading" class="projects-wrap">
         <div class="project-grid">
           <!-- 操作卡片：始终作为第一个格子 -->
@@ -84,7 +111,7 @@
             </div>
           </div>
           <div
-            v-for="d in dramas"
+            v-for="d in dramasRich"
             :key="d.id"
             class="project-card"
             @click="openProject(d.id)"
@@ -100,14 +127,30 @@
               <div class="project-badges">
                 <span class="badge badge-status" :class="'badge-status--' + (d.status || 'draft')">{{ formatStatus(d.status) }}</span>
                 <span v-if="d.episodes?.length" class="badge badge-episodes">{{ d.episodes.length }} 集</span>
-                <span v-if="totalStoryboards(d) > 0" class="badge badge-storyboards">{{ totalStoryboards(d) }} 分镜</span>
+                <span v-if="d._totalSb > 0" class="badge badge-storyboards">{{ d._totalSb }} 分镜</span>
                 <span v-if="d.metadata?.aspect_ratio" class="badge badge-ratio">{{ d.metadata.aspect_ratio }}</span>
                 <span v-if="d.style" class="badge badge-style">{{ formatStyle(d.style) }}</span>
                 <span v-if="d.genre" class="badge badge-genre">{{ formatGenre(d.genre) }}</span>
               </div>
+              <!-- 创作进度 -->
+              <div v-if="d._progressSteps.length > 0" class="project-progress">
+                <div
+                  v-for="step in d._progressSteps"
+                  :key="step.label"
+                  class="progress-dot"
+                  :class="{ 'progress-dot--done': step.done }"
+                  :title="step.label"
+                ></div>
+                <span class="progress-label">{{ d._progressLabel }}</span>
+              </div>
               <p class="project-meta">{{ formatDate(d.updated_at) }}</p>
             </div>
           </div>
+        </div>
+        <div v-if="!loading && dramas.length === 0" class="empty-state">
+          <div class="empty-state-icon">🎬</div>
+          <h3 class="empty-state-title">还没有项目</h3>
+          <p class="empty-state-desc">点击上方「新建短剧项目」开始创作你的第一个 AI 短剧</p>
         </div>
       </div>
     </main>
@@ -313,14 +356,6 @@
       </template>
     </el-dialog>
 
-    <!-- 微信二维码 -->
-    <el-dialog v-if="!vendorLockEnabled" v-model="showWechat" title="微信联系作者" width="320px" align-center>
-      <div style="text-align:center;padding:8px 0 4px">
-        <img src="/wx.jpg" alt="微信二维码" style="width:240px;height:240px;object-fit:contain;border-radius:8px;" />
-        <p style="margin:12px 0 0;font-size:13px;color:var(--text-secondary,#a1a1aa);">扫码添加微信，欢迎交流</p>
-      </div>
-    </el-dialog>
-
     <!-- 图片放大预览 -->
     <Teleport to="body">
       <div v-if="previewImageUrl" class="image-preview-overlay" @click="previewImageUrl = null">
@@ -349,15 +384,37 @@
         <el-button type="primary" :loading="editSaving" :disabled="!editForm.title?.trim()" @click="submitEdit">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 使用帮助 -->
+    <el-dialog v-model="showHelp" title="使用帮助" width="560px">
+      <div class="help-content">
+        <h4>快速上手</h4>
+        <ol>
+          <li><b>配置 AI 服务</b> — 点击右上角「AI配置」，填入你的 API Key</li>
+          <li><b>新建项目</b> — 点击「新建项目」，输入标题和画面比例</li>
+          <li><b>生成剧本</b> — 进入项目，输入故事梗概，AI 自动生成剧本</li>
+          <li><b>生成角色和场景</b> — AI 提取角色和场景，生成形象图</li>
+          <li><b>生成分镜</b> — AI 自动拆分镜脚本</li>
+          <li><b>生成图片和视频</b> — 逐镜生成静帧和视频片段</li>
+          <li><b>合成视频</b> — 所有分镜视频自动合成为完整剧集</li>
+        </ol>
+        <h4>支持的 AI 服务商</h4>
+        <p>阿里云通义、火山引擎豆包、可灵 Kling、Google Gemini、Vidu 等，详见「AI 配置」页面。</p>
+      </div>
+    </el-dialog>
+
+    <!-- 积分中心弹窗 -->
+    <Credits v-model:visible="showCreditsDialog" @refresh="userStore.fetchProfile()" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Delete, Setting, Plus, User, PictureFilled, Box, Sunny, Moon, ChatDotSquare, Download, Upload, QuestionFilled, FolderOpened, MagicStick, Files } from '@element-plus/icons-vue'
+import { Edit, Delete, Setting, Plus, User, PictureFilled, Box, Sunny, Moon, Download, Upload, QuestionFilled, FolderOpened, MagicStick, Files, Coin, ArrowDown } from '@element-plus/icons-vue'
 import { useTheme } from '@/composables/useTheme'
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch'
 import { dramaAPI } from '@/api/drama'
 import { characterLibraryAPI } from '@/api/characterLibrary'
 import { sceneLibraryAPI } from '@/api/sceneLibrary'
@@ -367,9 +424,36 @@ import { uploadAPI } from '@/api/upload'
 import { aiAPI } from '@/api/ai'
 import { imagesAPI } from '@/api/images'
 import { taskAPI } from '@/api/task'
+import { useUserStore } from '@/stores/user'
+import Credits from '@/views/Credits.vue'
+import { assetImageUrl } from '@/utils/assetImageUrl'
 
 const router = useRouter()
 const { isDark, toggle: toggleTheme } = useTheme()
+const userStore = useUserStore()
+
+// 用户信息 + 积分
+const userName = computed(() => userStore.user?.username || '')
+const userCredits = computed(() => userStore.credits)
+const showCreditsDialog = ref(false)
+
+onMounted(async () => {
+  if (userStore.isLoggedIn) {
+    await userStore.fetchProfile()
+  }
+})
+
+function onUserCommand(cmd) {
+  if (cmd === 'logout') {
+    userStore.logout()
+    router.push('/login')
+  } else if (cmd === 'credits') {
+    showCreditsDialog.value = true
+  } else if (cmd === 'password') {
+    showPasswordDialog.value = true
+  }
+}
+const showPasswordDialog = ref(false)
 
 // 库编辑图片 – 文件输入 refs
 const charLibFileRef  = ref(null)
@@ -430,20 +514,15 @@ async function doGenerateLibImg(form, prompt, api, reloadFn) {
 const loading = ref(false)
 const dramas = ref([])
 const total = ref(0)
+const searchKeyword = ref('')
+const { trigger: debouncedSearch } = useDebouncedSearch(() => loadList(), 300)
 
 const showAiConfigDialog = ref(false)
-const showWechat = ref(false)
+const showHelp = ref(false)
 const vendorLockEnabled = ref(false)
 
 // 图片预览
 const previewImageUrl = ref(null)
-function assetImageUrl(item) {
-  if (!item) return ''
-  if (typeof item === 'string') return item.startsWith('http') ? item : item
-  const localPath = item.local_path && String(item.local_path).trim()
-  if (localPath) return '/static/' + localPath.replace(/^\//, '')
-  return item.image_url || ''
-}
 function openImagePreview(url) {
   if (url) previewImageUrl.value = url
 }
@@ -459,7 +538,7 @@ const charLibraryKeyword = ref('')
 const showEditCharLibrary = ref(false)
 const editCharLibraryForm = ref(null)
 const editCharLibrarySaving = ref(false)
-let charLibraryKeywordTimer = null
+const { trigger: debouncedLoadCharLibrary } = useDebouncedSearch(() => { charLibraryPage.value = 1; loadCharLibraryList() }, 300)
 
 async function loadCharLibraryList() {
   charLibraryLoading.value = true
@@ -471,10 +550,6 @@ async function loadCharLibraryList() {
     if (p.page != null) charLibraryPage.value = p.page
     if (p.page_size != null) charLibraryPageSize.value = p.page_size
   } catch { charLibraryList.value = [] } finally { charLibraryLoading.value = false }
-}
-function debouncedLoadCharLibrary() {
-  if (charLibraryKeywordTimer) clearTimeout(charLibraryKeywordTimer)
-  charLibraryKeywordTimer = setTimeout(() => { charLibraryPage.value = 1; loadCharLibraryList() }, 300)
 }
 function openEditCharLibrary(item) {
   editCharLibraryForm.value = { id: item.id, name: item.name ?? '', category: item.category ?? '', description: item.description ?? '', tags: item.tags ?? '', image_url: item.image_url ?? '', local_path: item.local_path ?? null, imgUploading: false, imgGenerating: false }
@@ -506,7 +581,7 @@ const sceneLibraryKeyword = ref('')
 const showEditSceneLibrary = ref(false)
 const editSceneLibraryForm = ref(null)
 const editSceneLibrarySaving = ref(false)
-let sceneLibraryKeywordTimer = null
+const { trigger: debouncedLoadSceneLibrary } = useDebouncedSearch(() => { sceneLibraryPage.value = 1; loadSceneLibraryList() }, 300)
 
 async function loadSceneLibraryList() {
   sceneLibraryLoading.value = true
@@ -518,10 +593,6 @@ async function loadSceneLibraryList() {
     if (p.page != null) sceneLibraryPage.value = p.page
     if (p.page_size != null) sceneLibraryPageSize.value = p.page_size
   } catch { sceneLibraryList.value = [] } finally { sceneLibraryLoading.value = false }
-}
-function debouncedLoadSceneLibrary() {
-  if (sceneLibraryKeywordTimer) clearTimeout(sceneLibraryKeywordTimer)
-  sceneLibraryKeywordTimer = setTimeout(() => { sceneLibraryPage.value = 1; loadSceneLibraryList() }, 300)
 }
 function openEditSceneLibrary(item) {
   editSceneLibraryForm.value = { id: item.id, location: item.location ?? '', time: item.time ?? '', category: item.category ?? '', description: item.description ?? '', tags: item.tags ?? '', image_url: item.image_url ?? '', local_path: item.local_path ?? null, imgUploading: false, imgGenerating: false }
@@ -554,7 +625,7 @@ const propLibraryKeyword = ref('')
 const showEditPropLibrary = ref(false)
 const editPropLibraryForm = ref(null)
 const editPropLibrarySaving = ref(false)
-let propLibraryKeywordTimer = null
+const { trigger: debouncedLoadPropLibrary } = useDebouncedSearch(() => { propLibraryPage.value = 1; loadPropLibraryList() }, 300)
 
 async function loadPropLibraryList() {
   propLibraryLoading.value = true
@@ -566,10 +637,6 @@ async function loadPropLibraryList() {
     if (p.page != null) propLibraryPage.value = p.page
     if (p.page_size != null) propLibraryPageSize.value = p.page_size
   } catch { propLibraryList.value = [] } finally { propLibraryLoading.value = false }
-}
-function debouncedLoadPropLibrary() {
-  if (propLibraryKeywordTimer) clearTimeout(propLibraryKeywordTimer)
-  propLibraryKeywordTimer = setTimeout(() => { propLibraryPage.value = 1; loadPropLibraryList() }, 300)
 }
 function openEditPropLibrary(item) {
   editPropLibraryForm.value = { id: item.id, name: item.name ?? '', category: item.category ?? '', description: item.description ?? '', tags: item.tags ?? '', image_url: item.image_url ?? '', local_path: item.local_path ?? null, imgUploading: false, imgGenerating: false }
@@ -627,7 +694,7 @@ const editSaving = ref(false)
 function loadList() {
   loading.value = true
   dramaAPI
-    .list({ page: 1, page_size: 50 })
+    .list({ page: 1, page_size: 50, keyword: searchKeyword.value || undefined })
     .then((res) => {
       dramas.value = res?.items ?? []
       total.value = res?.pagination?.total ?? 0
@@ -646,62 +713,43 @@ function formatDate(val) {
   return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-function formatStatus(status) {
-  const map = { draft: '草稿', published: '已发布', archived: '已归档', generating: '生成中' }
-  return map[status] || status || '草稿'
+const STATUS_MAP = { draft: '草稿', published: '已发布', archived: '已归档', generating: '生成中' }
+const STYLE_MAP = {
+  realistic: '写实', cinematic: '电影感', documentary: '纪录片',
+  noir: '黑色电影', 'retro film': '复古胶片', horror: '恐怖',
+  'anime style': '日本动漫', anime: '日本动漫', 'comic style': '欧美漫画', cartoon: '卡通',
+  'ink wash': '国画水墨', 'chinese style': '中国风', historical: '古装', wuxia: '武侠',
+  watercolor: '水彩', 'oil painting': '油画', sketch: '素描',
+  'woodblock print': '版画', impressionist: '印象派',
+  fantasy: '奇幻', 'dark fantasy': '暗黑奇幻', 'sci-fi': '科幻', sci_fi: '科幻',
+  cyberpunk: '赛博朋克', steampunk: '蒸汽朋克', 'post-apocalyptic': '末世废土',
+  '3d render': '3D渲染', 'pixel art': '像素风', 'low poly': '低多边形',
+  minimalist: '极简', dreamy: '唯美梦幻',
 }
+const GENRE_MAP = { drama: '剧情', comedy: '喜剧', adventure: '冒险', romance: '爱情', thriller: '悬疑', action: '动作', horror: '恐怖' }
 
-function formatStyle(style) {
-  const map = {
-    // 写实 / 影视
-    realistic: '写实',
-    cinematic: '电影感',
-    documentary: '纪录片',
-    noir: '黑色电影',
-    'retro film': '复古胶片',
-    horror: '恐怖',
-    // 动漫 / 卡通
-    'anime style': '日本动漫',
-    anime: '日本动漫',
-    'comic style': '欧美漫画',
-    cartoon: '卡通',
-    // 中国风格
-    'ink wash': '国画水墨',
-    'chinese style': '中国风',
-    historical: '古装',
-    wuxia: '武侠',
-    // 绘画艺术
-    watercolor: '水彩',
-    'oil painting': '油画',
-    sketch: '素描',
-    'woodblock print': '版画',
-    impressionist: '印象派',
-    // 幻想 / 科幻
-    fantasy: '奇幻',
-    'dark fantasy': '暗黑奇幻',
-    'sci-fi': '科幻',
-    sci_fi: '科幻',
-    cyberpunk: '赛博朋克',
-    steampunk: '蒸汽朋克',
-    'post-apocalyptic': '末世废土',
-    // 数字 / 现代
-    '3d render': '3D渲染',
-    'pixel art': '像素风',
-    'low poly': '低多边形',
-    minimalist: '极简',
-    dreamy: '唯美梦幻',
+function formatStatus(status) { return STATUS_MAP[status] || status || '草稿' }
+function formatStyle(style) { return STYLE_MAP[style] || style }
+function formatGenre(genre) { return GENRE_MAP[genre] || genre }
+
+// 预计算每个项目的衍生数据，避免模板中重复调用函数
+const dramasRich = computed(() => dramas.value.map(d => {
+  const eps = d.episodes || []
+  const totalSb = eps.reduce((sum, ep) => sum + (ep.storyboards?.length || 0), 0)
+  let progressSteps = []
+  let progressLabel = ''
+  if (eps.length > 0) {
+    progressSteps = [
+      { label: '剧本', done: eps.some(ep => ep.script_content?.trim()) },
+      { label: '分镜', done: eps.some(ep => ep.storyboards?.length > 0) },
+      { label: '图片', done: eps.some(ep => ep.storyboards?.some(s => s.image_url)) },
+      { label: '视频', done: eps.some(ep => ep.video_url) },
+    ]
+    const done = progressSteps.filter(s => s.done).length
+    progressLabel = done + '/' + progressSteps.length
   }
-  return map[style] || style
-}
-
-function formatGenre(genre) {
-  const map = { drama: '剧情', comedy: '喜剧', adventure: '冒险', romance: '爱情', thriller: '悬疑', action: '动作', horror: '恐怖' }
-  return map[genre] || genre
-}
-
-function totalStoryboards(d) {
-  return (d.episodes || []).reduce((sum, ep) => sum + (ep.storyboards?.length || 0), 0)
-}
+  return { ...d, _totalSb: totalSb, _progressSteps: progressSteps, _progressLabel: progressLabel }
+}))
 
 function goNewProject() {
   showNewDialog.value = true
@@ -820,6 +868,9 @@ async function onDelete(d) {
   }
 }
 
+onBeforeUnmount(() => {
+})
+
 onMounted(async () => {
   loadList()
   loadExamples()
@@ -831,257 +882,235 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* ==============================================
+   FilmList — Apple HIG Design System
+   ============================================== */
+
+/* ── Page ── */
 .film-list {
   min-height: 100vh;
-  background: #08080d;
-  color: #e4e4e7;
-  background-image:
-    radial-gradient(ellipse 70% 45% at 50% -10%, rgba(99, 102, 241, 0.18) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 35% at 85% 55%, rgba(139, 92, 246, 0.1) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 30% at 10% 80%, rgba(79, 70, 229, 0.08) 0%, transparent 60%);
+  background: var(--bg-page);
+  color: var(--text-primary);
+  position: relative;
 }
+
+/* ── Header — solid background ── */
 .header {
-  background: rgba(12, 12, 18, 0.82);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(99, 102, 241, 0.18);
-  padding: 12px 24px;
+  background: var(--bg-card-solid);
+  border-bottom: 1px solid var(--border-muted);
+  padding: var(--space-md) var(--space-lg);
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 1px 0 rgba(99, 102, 241, 0.08), 0 4px 24px rgba(0, 0, 0, 0.3);
+  transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease;
 }
+html.light .header {
+  background: var(--bg-card-solid);
+  border-bottom: 1px solid var(--border-muted);
+}
+
 .header-inner {
   max-width: min(1400px, 96vw);
   margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-md);
   flex-wrap: wrap;
 }
+
+/* ── Logo ── */
 .logo {
   margin: 0;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: center;
+  gap: var(--space-sm);
   line-height: 1;
+  transition: filter var(--duration-normal) ease;
+}
+.logo:hover {
+  filter: brightness(1.05);
+}
+.logo-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  box-shadow: var(--shadow);
+  transition: box-shadow var(--duration-normal) ease;
+}
+.logo:hover .logo-icon {
+  box-shadow: var(--shadow-hover);
 }
 .logo-main {
-  font-size: 1.1rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  font-size: 1.2rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
-  background: linear-gradient(135deg, #a5b4fc 0%, #c084fc 50%, #f0abfc 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.35));
-}
-.logo-sub {
-  font-size: 0.68rem;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  color: #6d6d7a;
-  -webkit-text-fill-color: #6d6d7a;
-  filter: none;
+  color: var(--accent);
+  letter-spacing: -0.02em;
 }
 .page-title {
-  color: #a1a1aa;
+  color: var(--text-muted);
   font-size: 0.95rem;
 }
+
 .header-library {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-left: 20px;
+  gap: var(--space-xs);
+  margin-left: var(--space-lg);
 }
 .header-actions {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-sm);
 }
 
-/* 资源库按钮 —— 靛紫调 */
-.btn-library {
-  --el-button-bg-color: rgba(99, 102, 241, 0.12);
-  --el-button-border-color: rgba(99, 102, 241, 0.35);
-  --el-button-text-color: #a5b4fc;
-  --el-button-hover-bg-color: rgba(99, 102, 241, 0.22);
-  --el-button-hover-border-color: rgba(99, 102, 241, 0.55);
-  --el-button-hover-text-color: #c7d2fe;
-  --el-button-active-bg-color: rgba(99, 102, 241, 0.3);
-  --el-button-active-border-color: rgba(99, 102, 241, 0.7);
-}
-html.light .btn-library {
-  --el-button-bg-color: rgba(79, 70, 229, 0.08);
-  --el-button-border-color: rgba(79, 70, 229, 0.3);
-  --el-button-text-color: #3730a3;
-  --el-button-hover-bg-color: rgba(79, 70, 229, 0.14);
-  --el-button-hover-border-color: rgba(79, 70, 229, 0.5);
-  --el-button-hover-text-color: #312e81;
-  --el-button-active-bg-color: rgba(79, 70, 229, 0.2);
-  --el-button-active-border-color: rgba(79, 70, 229, 0.65);
+/* ── Header buttons — solid style ── */
+.btn-library, .btn-help, .btn-theme, .btn-settings, .btn-import, .btn-credits, .btn-user {
+  --el-button-bg-color: transparent;
+  --el-button-border-color: var(--border-muted);
+  --el-button-text-color: var(--text-muted);
+  --el-button-hover-bg-color: var(--bg-hover);
+  --el-button-hover-border-color: var(--accent-border);
+  --el-button-hover-text-color: var(--text-primary);
+  transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
-/* 主题切换按钮 */
-.btn-theme {
-  --el-button-bg-color: rgba(148, 163, 184, 0.1);
-  --el-button-border-color: rgba(148, 163, 184, 0.3);
-  --el-button-text-color: #94a3b8;
-  --el-button-hover-bg-color: rgba(148, 163, 184, 0.2);
-  --el-button-hover-border-color: rgba(148, 163, 184, 0.5);
-  --el-button-hover-text-color: #cbd5e1;
-  transition: all 0.2s;
-}
-html.light .btn-theme {
-  --el-button-bg-color: rgba(99, 102, 241, 0.08);
-  --el-button-border-color: rgba(99, 102, 241, 0.3);
-  --el-button-text-color: #6366f1;
-  --el-button-hover-bg-color: rgba(99, 102, 241, 0.15);
-  --el-button-hover-border-color: rgba(99, 102, 241, 0.5);
-  --el-button-hover-text-color: #4f46e5;
-}
-
-/* 微信我按钮 —— 绿调 */
-.btn-wechat {
-  --el-button-bg-color: rgba(34, 197, 94, 0.1);
-  --el-button-border-color: rgba(34, 197, 94, 0.3);
-  --el-button-text-color: #22c55e;
-  --el-button-hover-bg-color: rgba(34, 197, 94, 0.2);
-  --el-button-hover-border-color: rgba(34, 197, 94, 0.5);
-  --el-button-hover-text-color: #16a34a;
-  transition: all 0.2s;
-}
-html.light .btn-wechat {
-  --el-button-bg-color: rgba(21, 128, 61, 0.08);
-  --el-button-border-color: rgba(21, 128, 61, 0.3);
-  --el-button-text-color: #166534;
-  --el-button-hover-bg-color: rgba(21, 128, 61, 0.14);
-  --el-button-hover-border-color: rgba(21, 128, 61, 0.5);
-  --el-button-hover-text-color: #14532d;
-}
-
-/* AI配置按钮 —— 琥珀调 */
-.btn-settings {
-  --el-button-bg-color: rgba(234, 179, 8, 0.1);
-  --el-button-border-color: rgba(234, 179, 8, 0.32);
-  --el-button-text-color: #fcd34d;
-  --el-button-hover-bg-color: rgba(234, 179, 8, 0.2);
-  --el-button-hover-border-color: rgba(234, 179, 8, 0.5);
-  --el-button-hover-text-color: #fde68a;
-  --el-button-active-bg-color: rgba(234, 179, 8, 0.28);
-  --el-button-active-border-color: rgba(234, 179, 8, 0.65);
-}
-html.light .btn-settings {
-  --el-button-bg-color: rgba(180, 83, 9, 0.07);
-  --el-button-border-color: rgba(180, 83, 9, 0.28);
-  --el-button-text-color: #92400e;
-  --el-button-hover-bg-color: rgba(180, 83, 9, 0.12);
-  --el-button-hover-border-color: rgba(180, 83, 9, 0.45);
-  --el-button-hover-text-color: #78350f;
-  --el-button-active-bg-color: rgba(180, 83, 9, 0.18);
-  --el-button-active-border-color: rgba(180, 83, 9, 0.6);
-}
-
-/* 导入按钮 —— 亮色模式下提升可读性 */
-html.light .btn-import {
-  --el-button-text-color: #374151;
-  --el-button-border-color: #d1d5db;
-  --el-button-hover-text-color: #1f2937;
-  --el-button-hover-border-color: #9ca3af;
-}
-
+/* ── Main content area ── */
 .main {
   max-width: min(1400px, 96vw);
   margin: 0 auto;
-  padding: 24px 16px 48px;
+  padding: var(--space-lg) var(--space-md) var(--space-2xl);
+  animation: fadeIn var(--duration-normal) ease both;
+}
+.search-bar {
+  max-width: 400px;
+  margin-bottom: var(--space-md);
+}
+.search-input {
+  --el-input-width: 100%;
+}
+.search-input :deep(.el-input__wrapper) {
+  border-radius: var(--radius-lg);
 }
 .projects-wrap {
   min-height: 200px;
 }
+
 .empty {
   text-align: center;
-  padding: 48px 24px;
+  padding: var(--space-2xl) var(--space-lg);
 }
 .empty-title {
   font-size: 1.1rem;
-  color: #e4e4e7;
-  margin: 0 0 8px;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-sm);
 }
 .empty-desc {
-  color: #71717a;
+  color: var(--text-subtle);
   font-size: 0.9rem;
-  margin: 0 0 20px;
+  margin: 0 0 var(--space-md);
 }
+
+.empty-state {
+  text-align: center;
+  padding: var(--space-2xl) var(--space-lg);
+  color: var(--text-muted);
+}
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: var(--space-md);
+}
+.empty-state-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-sm);
+}
+.empty-state-desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ── Project grid ── */
 .project-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 18px;
-}
-.project-card {
-  position: relative;
-  background: rgba(24, 24, 30, 0.75);
-  border: 1px solid rgba(63, 63, 70, 0.6);
-  border-radius: 14px;
-  padding: 20px;
-  cursor: pointer;
-  transition: border-color 0.25s, background 0.25s, transform 0.25s, box-shadow 0.25s;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  overflow: hidden;
-}
-.project-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 14px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.04) 0%, transparent 60%);
-  pointer-events: none;
-}
-.project-card:hover {
-  border-color: rgba(99, 102, 241, 0.55);
-  background: rgba(28, 28, 36, 0.9);
-  transform: translateY(-3px);
-  box-shadow: 0 12px 40px rgba(99, 102, 241, 0.15), 0 0 0 1px rgba(99, 102, 241, 0.1), 0 2px 8px rgba(0, 0, 0, 0.4);
+  gap: var(--space-md);
 }
 
-/* 操作卡片 */
+/* ── Project cards — solid background ── */
+.project-card {
+  position: relative;
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  cursor: pointer;
+  transition: border-color var(--duration-normal) ease,
+              box-shadow var(--duration-normal) ease;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  animation: fadeIn var(--duration-normal) ease both;
+}
+
+.project-card:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-hover);
+}
+html.light .project-card {
+  background: var(--bg-card-solid);
+  border-color: var(--border-muted);
+}
+html.light .project-card:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-hover);
+}
+
+/* ── Action card (quick start) — solid border ── */
 .action-card {
   cursor: default;
   border-style: dashed;
-  border-color: rgba(99, 102, 241, 0.4);
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(139, 92, 246, 0.04) 100%);
+  border-color: var(--accent-border);
+  background: var(--bg-card-solid);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 0 40px rgba(99, 102, 241, 0.04);
+  transition: border-color var(--duration-normal) ease, box-shadow var(--duration-normal) ease;
 }
 .action-card:hover {
-  border-color: rgba(99, 102, 241, 0.65);
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.07) 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.12), inset 0 0 40px rgba(99, 102, 241, 0.06);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-hover);
 }
-.action-card::before {
-  display: none;
+html.light .action-card {
+  background: var(--bg-card-solid);
+  border-color: var(--accent-border);
 }
+html.light .action-card:hover {
+  box-shadow: var(--shadow-hover);
+}
+
 .action-card-inner {
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-md);
 }
 .action-card-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #a5b4fc;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent);
   margin: 0;
+  letter-spacing: -0.01em;
 }
 .action-card-buttons {
   display: flex;
-  gap: 12px;
+  gap: var(--space-md);
   width: 100%;
   justify-content: center;
 }
@@ -1089,163 +1118,262 @@ html.light .btn-import {
   min-width: 150px;
 }
 .action-btn-new {
-  --el-button-bg-color: var(--el-color-primary);
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #1a1a1f !important;
+  font-weight: 600 !important;
+  box-shadow: var(--shadow) !important;
+  transition: background var(--duration-fast) ease, box-shadow var(--duration-fast) ease !important;
+}
+.action-btn-new:hover {
+  filter: brightness(1.1);
+  box-shadow: var(--shadow-hover) !important;
 }
 .action-btn-import {
-  --el-button-bg-color: rgba(99, 102, 241, 0.12);
-  --el-button-border-color: rgba(99, 102, 241, 0.35);
-  --el-button-text-color: #a5b4fc;
-  --el-button-hover-bg-color: rgba(99, 102, 241, 0.22);
-  --el-button-hover-border-color: rgba(99, 102, 241, 0.55);
-  --el-button-hover-text-color: #c7d2fe;
+  --el-button-bg-color: transparent;
+  --el-button-border-color: var(--border-muted);
+  --el-button-text-color: var(--text-muted);
+  --el-button-hover-bg-color: var(--bg-hover);
+  --el-button-hover-border-color: var(--accent-border);
+  --el-button-hover-text-color: var(--text-primary);
 }
+
 .action-card-example {
   width: 100%;
-  padding-top: 8px;
-  border-top: 1px solid rgba(99, 102, 241, 0.15);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-muted);
 }
 .example-hint {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
   justify-content: center;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-sm);
 }
 .example-hint-icon {
-  color: #a5b4fc;
+  color: var(--accent);
   font-size: 15px;
 }
 .example-hint-text {
   font-size: 0.8rem;
-  color: #71717a;
+  color: var(--text-subtle);
 }
 .example-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
   justify-content: center;
 }
 .example-btn {
-  --el-button-bg-color: rgba(34, 197, 94, 0.1);
-  --el-button-border-color: rgba(34, 197, 94, 0.3);
-  --el-button-text-color: #4ade80;
-  --el-button-hover-bg-color: rgba(34, 197, 94, 0.2);
-  --el-button-hover-border-color: rgba(34, 197, 94, 0.5);
-  --el-button-hover-text-color: #22c55e;
+  --el-button-bg-color: rgba(255, 255, 255, 0.05);
+  --el-button-border-color: var(--border-muted);
+  --el-button-text-color: var(--text-muted);
+  --el-button-hover-bg-color: var(--bg-hover);
+  --el-button-hover-border-color: var(--accent-border);
+  --el-button-hover-text-color: var(--text-primary);
 }
+
+/* ── Project card body ── */
 .project-card-body {
   padding-right: 56px;
 }
 .project-title {
-  font-size: 1.05rem;
-  margin: 0 0 8px;
-  color: #fafafa;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 var(--space-sm);
+  color: var(--text-bright);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
+html.light .project-title {
+  color: var(--text-bright);
+}
+
 .project-desc {
   font-size: 0.875rem;
-  color: #a1a1aa;
-  margin: 0 0 12px;
-  line-height: 1.4;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-md);
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* ── Badges — rounded pills ── */
 .project-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-xs);
   margin: 0 0 10px;
 }
 .badge {
   display: inline-flex;
   align-items: center;
   font-size: 0.72rem;
-  padding: 2px 8px;
+  padding: 2px var(--space-sm);
   border-radius: 99px;
   font-weight: 500;
   line-height: 1.5;
   white-space: nowrap;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  border: 1px solid var(--border-muted);
+  transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease;
 }
 .badge-status--draft {
-  background: rgba(113, 113, 122, 0.15);
-  color: #a1a1aa;
-  border: 1px solid rgba(113, 113, 122, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  border: 1px solid var(--border-muted);
 }
 .badge-status--published {
-  background: rgba(34, 197, 94, 0.12);
+  background: rgba(34, 197, 94, 0.1);
   color: #4ade80;
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  border: 1px solid rgba(34, 197, 94, 0.2);
 }
 .badge-status--generating {
-  background: rgba(234, 179, 8, 0.12);
-  color: #fcd34d;
-  border: 1px solid rgba(234, 179, 8, 0.3);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
 }
 .badge-status--archived {
-  background: rgba(99, 102, 241, 0.1);
-  color: #a5b4fc;
-  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: rgba(91, 143, 185, 0.08);
+  color: var(--text-muted);
+  border: 1px solid rgba(91, 143, 185, 0.2);
 }
 .badge-episodes {
-  background: rgba(14, 165, 233, 0.12);
-  color: #38bdf8;
-  border: 1px solid rgba(14, 165, 233, 0.28);
+  background: rgba(108, 180, 238, 0.08);
+  color: var(--accent2);
+  border: 1px solid rgba(108, 180, 238, 0.15);
 }
 .badge-storyboards {
-  background: rgba(20, 184, 166, 0.12);
+  background: rgba(20, 184, 166, 0.08);
   color: #2dd4bf;
-  border: 1px solid rgba(20, 184, 166, 0.28);
+  border: 1px solid rgba(20, 184, 166, 0.15);
 }
 .badge-ratio {
-  background: rgba(251, 146, 60, 0.1);
-  color: #fb923c;
-  border: 1px solid rgba(251, 146, 60, 0.25);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
   font-family: monospace;
 }
 .badge-style {
-  background: rgba(168, 85, 247, 0.1);
-  color: #c084fc;
-  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: rgba(168, 130, 200, 0.08);
+  color: #c4a8e0;
+  border: 1px solid rgba(168, 130, 200, 0.15);
 }
 .badge-genre {
-  background: rgba(249, 115, 22, 0.1);
+  background: rgba(249, 115, 22, 0.08);
   color: #fb923c;
-  border: 1px solid rgba(249, 115, 22, 0.25);
+  border: 1px solid rgba(249, 115, 22, 0.15);
 }
+
+html.light .badge-status--published {
+  color: #16a34a;
+}
+html.light .badge-status--generating {
+  color: var(--accent);
+}
+html.light .badge-episodes {
+  color: #3b82f6;
+}
+html.light .badge-storyboards {
+  color: #0d9488;
+}
+html.light .badge-style {
+  color: #7c3aed;
+}
+html.light .badge-genre {
+  color: #ea580c;
+}
+
 .project-meta {
   font-size: 0.75rem;
-  color: #71717a;
+  color: var(--text-subtle);
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ── Progress dots ── */
+.project-progress {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  margin-bottom: 2px;
+  align-items: center;
+}
+.progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border-muted);
+  transition: background var(--duration-fast) ease;
+  flex-shrink: 0;
+}
+.progress-dot--done {
+  background: var(--accent);
+}
+.progress-label {
+  font-size: 11px;
+  color: var(--text-subtle);
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
 }
 .project-card-actions {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: var(--space-md);
+  right: var(--space-md);
   display: flex;
-  gap: 6px;
+  gap: var(--space-xs);
+  opacity: 0;
+  transition: opacity var(--duration-fast) ease;
+}
+.project-card:hover .project-card-actions {
+  opacity: 1;
 }
 .project-card-actions .el-button {
   --el-button-size: 28px;
   padding: 0;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-card-solid) !important;
+  border-color: var(--border-muted) !important;
+  color: var(--text-muted) !important;
+  transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+.project-card-actions .el-button:hover {
+  border-color: var(--accent-border) !important;
+  color: var(--text-primary) !important;
 }
 .project-card-actions .el-button .el-icon {
   font-size: 14px;
 }
 
-/* 公共库弹窗 */
-:global(.library-dialog .el-dialog__body) { padding-top: 8px; }
+/* ── Library dialog ── */
+:global(.library-dialog .el-dialog__body) { padding-top: var(--space-sm); }
 
-/* 编辑弹框内图片区 */
+/* ── Image editor in dialogs ── */
 .lib-img-editor { display: flex; align-items: center; gap: 14px; }
-.lib-img-thumb { width: 88px; height: 88px; border-radius: 8px; overflow: hidden; cursor: zoom-in; background: var(--bg-inner, #1c1c1e); border: 1px solid var(--border-color, #27272a); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.lib-img-thumb {
+  width: 88px; height: 88px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: zoom-in;
+  background: var(--bg-inner);
+  border: 1px solid var(--border-muted);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
 .lib-img-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.lib-img-empty { color: var(--text-faint, #52525b); font-size: 26px; }
-.lib-img-btns { display: flex; flex-direction: column; gap: 8px; }
-.library-toolbar { margin-bottom: 12px; }
+.lib-img-empty { color: var(--text-faint); font-size: 26px; }
+.lib-img-btns { display: flex; flex-direction: column; gap: var(--space-sm); }
+
+.library-toolbar { margin-bottom: var(--space-md); }
 .library-list {
   min-height: 200px;
   max-height: 420px;
@@ -1254,119 +1382,90 @@ html.light .btn-import {
   flex-direction: column;
   gap: 10px;
 }
+
+/* ── Library items — solid style ── */
 .library-item {
   display: flex;
-  gap: 12px;
-  padding: 10px;
-  background: #1c1c1e;
-  border: 1px solid #27272a;
-  border-radius: 8px;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
+.library-item:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-hover);
+}
+
 .library-item-cover {
   width: 72px;
   height: 72px;
   flex-shrink: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   overflow: hidden;
-  background: #27272a;
+  background: var(--bg-inner);
+  border: 1px solid var(--border-muted);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: border-color var(--duration-fast) ease;
+}
+.library-item-cover:hover {
+  border-color: var(--accent-border);
 }
 .library-item-cover img { width: 100%; height: 100%; object-fit: cover; }
-.library-item-placeholder { font-size: 0.8rem; color: #71717a; }
+.library-item-placeholder { font-size: 0.8rem; color: var(--text-subtle); }
 .library-item-info { flex: 1; min-width: 0; }
-.library-item-name { font-weight: 500; margin-bottom: 4px; color: #fafafa; }
-.library-item-desc { font-size: 0.85rem; color: #a1a1aa; margin-bottom: 8px; }
-.library-item-actions { display: flex; gap: 8px; }
-.library-empty { text-align: center; color: #71717a; padding: 40px 20px; }
-.library-pagination { margin-top: 12px; display: flex; justify-content: center; }
+.library-item-name { font-weight: 500; margin-bottom: var(--space-xs); color: var(--text-bright); }
+.library-item-desc { font-size: 0.85rem; color: var(--text-muted); margin-bottom: var(--space-sm); }
+.library-item-actions { display: flex; gap: var(--space-sm); }
+.library-empty { text-align: center; color: var(--text-subtle); padding: 40px var(--space-md); }
+.library-pagination { margin-top: var(--space-md); display: flex; justify-content: center; }
 
-/* ===== 亮色模式适配 ===== */
-html.light .film-list {
-  background: #f5f3ff;
-  color: #1e1b4b;
-  background-image:
-    radial-gradient(ellipse 70% 45% at 50% -10%, rgba(99, 102, 241, 0.1) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 35% at 85% 55%, rgba(139, 92, 246, 0.06) 0%, transparent 60%);
-}
-html.light .header {
-  background: rgba(248, 246, 255, 0.88);
-  border-bottom-color: rgba(99, 102, 241, 0.2);
-  box-shadow: 0 1px 0 rgba(99, 102, 241, 0.1), 0 4px 16px rgba(99, 102, 241, 0.06);
-}
-html.light .logo-main {
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.2));
-}
-html.light .logo-sub {
-  color: #9ca3af;
-  -webkit-text-fill-color: #9ca3af;
-}
-html.light .project-card {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(199, 210, 254, 0.8);
-  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.06), 0 2px 12px rgba(0, 0, 0, 0.04);
-  backdrop-filter: none;
-}
-html.light .project-card::before {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, transparent 60%);
-}
-html.light .project-card:hover {
-  border-color: rgba(99, 102, 241, 0.5);
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 12px 36px rgba(99, 102, 241, 0.12), 0 0 0 1px rgba(99, 102, 241, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-html.light .action-card {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(139, 92, 246, 0.04) 100%);
-  border-color: rgba(99, 102, 241, 0.35);
-}
-html.light .action-card:hover {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.07) 100%);
-  border-color: rgba(99, 102, 241, 0.55);
-}
-html.light .action-card-title { color: #4f46e5; }
-html.light .project-title { color: #1e1b4b; }
-html.light .project-desc { color: #4b5563; }
-html.light .project-meta { color: #6b7280; }
-html.light .example-hint-text { color: #6b7280; }
-html.light .library-item {
-  background: #faf9ff;
-  border-color: #e5e7eb;
-}
-html.light .library-item-name { color: #1e1b4b; }
-html.light .library-item-desc { color: #4b5563; }
-html.light .library-empty { color: #6b7280; }
-html.light .lib-img-thumb {
-  background: #f3f4f6;
-  border-color: #e5e7eb;
-}
-html.light .lib-img-empty { color: #9ca3af; }
-html.light .badge-status--draft {
-  background: rgba(107, 114, 128, 0.1);
-  color: #4b5563;
-  border-color: rgba(107, 114, 128, 0.25);
-}
-
-/* ===== 图片放大预览 ===== */
+/* ── Image preview overlay ── */
 .image-preview-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.85);
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
   cursor: zoom-out;
+  animation: fadeIn var(--duration-fast) ease both;
 }
 .image-preview-img {
   max-width: 90vw;
   max-height: 90vh;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   object-fit: contain;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  animation: fadeIn var(--duration-normal) ease both;
+}
+
+/* ── Help dialog ── */
+.help-content h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin: 16px 0 8px;
+}
+.help-content h4:first-child {
+  margin-top: 0;
+}
+.help-content ol {
+  padding-left: 20px;
+  line-height: 2;
+  color: var(--text-primary);
+}
+.help-content ol b {
+  color: var(--text-bright);
+}
+.help-content p {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
 }
 </style>

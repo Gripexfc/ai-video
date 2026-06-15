@@ -6,8 +6,8 @@ function routes(db, log) {
     list: (req, res) => {
       try {
         const query = { ...req.query };
-        const items = videoMergeService.list(db, query);
-        response.success(res, items);
+        const result = videoMergeService.list(db, query);
+        response.successWithPagination(res, result.items, result.total, result.page, result.pageSize);
       } catch (err) {
         log.error('video-merges list', { error: err.message });
         response.internalError(res, err.message);

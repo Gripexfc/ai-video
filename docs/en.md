@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎬 LocalMiniDrama
+# 🎬 视频miao~
 
 **A locally-running AI short drama & comic generator — download and run, no cloud required, fully open source**
 
@@ -90,13 +90,13 @@ This project is built entirely in JavaScript from scratch. Connect your own AI A
 ### Option A — Download exe (recommended)
 
 Go to **[Releases](../../releases)** and download the latest:
-- `LocalMiniDrama Setup x.x.x.exe` — NSIS installer
-- `LocalMiniDrama x.x.x.exe` — portable, no install needed
+- `视频miao~ Setup x.x.x.exe` — NSIS installer
+- `视频miao~ x.x.x.exe` — portable, no install needed
 
 Double-click → open **AI Config** → enter your API key → start creating.
 
 > On first launch a config file is created at:  
-> `%APPDATA%\LocalMiniDrama\backend\configs\config.yaml`
+> `%APPDATA%\视频miao~\backend\configs\config.yaml`
 
 ### Option B — Development Mode
 
@@ -104,8 +104,8 @@ Double-click → open **AI Config** → enter your API key → start creating.
 
 ```bash
 # 1. Clone
-git clone https://github.com/your-username/LocalMiniDrama.git
-cd LocalMiniDrama
+git clone https://github.com/your-username/视频miao~.git
+cd 视频miao~
 
 # 2. Backend (port 5679)
 cd backend-node
@@ -145,7 +145,7 @@ You can also double-click `run_dev.bat` at the project root to **start both serv
 ## 🏗 Architecture
 
 ```
-LocalMiniDrama/
+视频miao~/
 ├── backend-node/          # Node.js backend (Express + SQLite)
 │   ├── src/
 │   │   ├── config/        # YAML config loader

@@ -1,8 +1,27 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { cancelPendingRequests } from '@/utils/request'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/Login.vue'),
+      meta: { title: '登录', public: true }
+    },
+    {
+      path: '/admin/login',
+      name: 'admin-login',
+      component: () => import('@/views/AdminLogin.vue'),
+      meta: { title: '后台登录', public: true }
+    },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: () => import('@/views/Admin.vue'),
+      meta: { title: '后台管理', public: true }
+    },
     {
       path: '/',
       name: 'list',
@@ -38,14 +57,29 @@ const router = createRouter({
       name: 'media-library',
       component: () => import('@/views/MediaLibrary.vue'),
       meta: { title: '媒体素材库' }
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      redirect: '/'
     }
   ]
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  cancelPendingRequests()
+
   if (to.meta.title) {
-    document.title = `${to.meta.title} - LocalMiniDrama`
+    document.title = `${to.meta.title} - 视频miao~`
   }
+
+  // 公开页面不需要鉴权
+  if (to.meta.public) return true
+
+  // 登录检查（无 token 跳转登录页）
+  const token = localStorage.getItem('user_token')
+  if (!token) return { path: '/login' }
+
   return true
 })
 

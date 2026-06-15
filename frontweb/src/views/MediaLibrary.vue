@@ -135,6 +135,7 @@ import {
 } from '@element-plus/icons-vue'
 import { uploadAPI } from '@/api/upload'
 import request from '@/utils/request'
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch'
 
 const loading = ref(false)
 const uploading = ref(false)
@@ -149,7 +150,7 @@ const selectedIds = reactive(new Set())
 const showPreview = ref(false)
 const previewItem = ref(null)
 const uploadInput = ref(null)
-let keywordTimer = null
+const { trigger: debouncedLoad } = useDebouncedSearch(() => loadMedia(), 400)
 
 function triggerUpload() {
   uploadInput.value?.click()
@@ -174,10 +175,6 @@ async function onUpload(e) {
   loadMedia()
 }
 
-function debouncedLoad() {
-  clearTimeout(keywordTimer)
-  keywordTimer = setTimeout(loadMedia, 400)
-}
 
 async function loadMedia() {
   loading.value = true
@@ -265,83 +262,120 @@ onMounted(loadMedia)
 </script>
 
 <style scoped>
+/* ── Media Library — Midnight Cinema ── */
+
 .media-library-page {
   min-height: 100vh;
-  background: #f5f7fa;
-  padding: 20px;
+  background: var(--bg-page);
+  padding: 28px 28px;
+  position: relative;
 }
 
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  animation: fadeInUp 0.5s ease both;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .page-title {
-  font-size: 22px;
-  font-weight: 600;
-  color: #1a1a2e;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-bright);
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
 .filter-bar {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
+  animation: fadeInUp 0.55s ease both;
+  animation-delay: 0.05s;
 }
 
 .search-input {
-  width: 240px;
+  width: 260px;
 }
 
 .upload-progress {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  color: #409eff;
+  gap: 10px;
+  margin-bottom: 16px;
+  color: var(--accent);
   font-size: 14px;
+  font-weight: 500;
+  padding: 10px 16px;
+  background: var(--accent-muted);
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  animation: fadeIn 0.3s ease;
 }
 
 .media-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 16px;
   min-height: 200px;
+  animation: fadeInUp 0.6s ease both;
+  animation-delay: 0.1s;
 }
 
+/* ── Media Card ── */
 .media-card {
-  background: #fff;
-  border-radius: 8px;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 2px solid transparent;
+  border: 1px solid var(--glass-border);
   cursor: pointer;
-  transition: all .2s;
-  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  transition: box-shadow var(--duration-normal) ease,
+              border-color var(--duration-normal) ease;
+  box-shadow: var(--shadow-card);
+  animation: scaleIn 0.35s ease both;
 }
+
+.media-card:nth-child(1)  { animation-delay: 0.04s; }
+.media-card:nth-child(2)  { animation-delay: 0.08s; }
+.media-card:nth-child(3)  { animation-delay: 0.12s; }
+.media-card:nth-child(4)  { animation-delay: 0.16s; }
+.media-card:nth-child(5)  { animation-delay: 0.20s; }
+.media-card:nth-child(6)  { animation-delay: 0.24s; }
+.media-card:nth-child(7)  { animation-delay: 0.28s; }
+.media-card:nth-child(8)  { animation-delay: 0.32s; }
+.media-card:nth-child(9)  { animation-delay: 0.36s; }
+.media-card:nth-child(10) { animation-delay: 0.40s; }
+.media-card:nth-child(n+11) { animation-delay: 0.44s; }
 
 .media-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+  box-shadow: var(--shadow-hover);
 }
 
 .media-card.selected {
-  border-color: #409eff;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
+.media-card.selected:hover {
+  box-shadow: 0 0 0 1px var(--accent), var(--shadow-hover);
+}
+
+/* ── Thumbnail ── */
 .media-thumb {
   aspect-ratio: 1;
-  background: #f3f4f6;
+  background: var(--bg-page);
   overflow: hidden;
   position: relative;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .thumb-img,
@@ -349,14 +383,21 @@ onMounted(loadMedia)
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.4s ease;
 }
 
+.media-card:hover .thumb-img,
+.media-card:hover .thumb-video {
+  transform: scale(1.05);
+}
+
+/* ── Overlay ── */
 .media-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,.35);
+  background: linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.6) 100%);
   opacity: 0;
-  transition: opacity .2s;
+  transition: opacity 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -372,27 +413,29 @@ onMounted(loadMedia)
 
 .check-icon {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  font-size: 20px;
-  color: #409eff;
-  background: #fff;
+  top: 10px;
+  right: 10px;
+  font-size: 22px;
+  color: var(--accent);
+  background: rgba(0,0,0,0.5);
   border-radius: 50%;
+  padding: 4px;
 }
 
 .overlay-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
 .media-info {
-  padding: 8px;
+  padding: 10px 12px;
 }
 
 .media-name {
   display: block;
   font-size: 12px;
-  color: #374151;
+  font-weight: 500;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -400,7 +443,8 @@ onMounted(loadMedia)
 
 .media-meta {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--text-subtle);
+  margin-top: 2px;
 }
 
 .empty-media {
@@ -409,44 +453,52 @@ onMounted(loadMedia)
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 300px;
-  color: #9ca3af;
-  gap: 12px;
+  height: 340px;
+  color: var(--text-subtle);
+  gap: 14px;
 }
 
 .empty-icon {
-  font-size: 48px;
+  font-size: 52px;
+  opacity: 0.35;
+  animation: float 5s ease-in-out infinite;
 }
 
 .pagination {
-  margin-top: 20px;
+  margin-top: 28px;
   display: flex;
   justify-content: center;
 }
 
+/* ── Batch Bar ── */
 .batch-bar {
   position: fixed;
-  bottom: 20px;
+  bottom: 28px;
   left: 50%;
   transform: translateX(-50%);
-  background: #1a1a2e;
-  color: #fff;
-  padding: 10px 20px;
-  border-radius: 24px;
+  background: var(--bg-card);
+  color: var(--text-bright);
+  padding: 12px 28px;
+  border-radius: 999px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   font-size: 14px;
-  box-shadow: 0 4px 16px rgba(0,0,0,.2);
+  font-weight: 500;
+  box-shadow: var(--shadow-hover);
+  border: 1px solid var(--glass-border);
+  animation: fadeInUp 0.35s ease;
+  z-index: 100;
 }
 
+/* ── Preview ── */
 .preview-content {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 300px;
-  background: #000;
-  border-radius: 8px;
+  min-height: 360px;
+  background: var(--bg-inner);
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
@@ -462,17 +514,75 @@ onMounted(loadMedia)
 }
 
 .preview-meta {
-  margin-top: 16px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  background: var(--bg-inner);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
 }
 
 .meta-row {
   font-size: 13px;
-  color: #6b7280;
-  margin-bottom: 4px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  line-height: 1.5;
+}
+
+.meta-row:last-child {
+  margin-bottom: 0;
 }
 
 .meta-row span {
-  font-weight: 500;
-  color: #374151;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ── Light Mode Overrides ── */
+html.light .media-library-page {
+  background: var(--bg-page);
+}
+
+html.light .media-card {
+  background: var(--bg-card);
+  border-color: transparent;
+  box-shadow: var(--shadow-card);
+}
+
+html.light .media-card:hover {
+  box-shadow: var(--shadow-hover);
+  border-color: var(--accent-border);
+}
+
+html.light .media-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+html.light .media-thumb {
+  background: var(--bg-inner);
+}
+
+html.light .media-overlay {
+  background: linear-gradient(180deg, transparent 30%, rgba(255,255,255,0.5) 100%);
+}
+
+html.light .check-icon {
+  color: var(--accent);
+  background: rgba(255,255,255,0.8);
+}
+
+html.light .batch-bar {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  box-shadow: var(--shadow-hover);
+}
+
+html.light .preview-content {
+  background: var(--bg-inner);
+}
+
+html.light .preview-meta {
+  background: var(--bg-inner);
+  border-color: var(--glass-border);
 }
 </style>

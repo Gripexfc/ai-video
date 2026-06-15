@@ -39,8 +39,24 @@ function runMigrations(database) {
     console.log('Migrations dir missing, skipping:', migrationsDir);
     return;
   }
+
+  // 确保迁移追踪表存在
+  database.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    filename  TEXT PRIMARY KEY,
+    applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+
+  // 读取已执行的迁移文件列表
+  const applied = new Set(
+    database.prepare('SELECT filename FROM schema_migrations').all().map((r) => r.filename)
+  );
+
   const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
   for (const file of files) {
+    if (applied.has(file)) {
+      console.log('Skip (already applied):', file);
+      continue;
+    }
     const fullPath = path.join(migrationsDir, file);
     const sql = fs.readFileSync(fullPath, 'utf8');
     const statements = sql
@@ -52,6 +68,8 @@ function runMigrations(database) {
     } else {
       statements.forEach((stmt, i) => runOne(database, stmt + ';', file, i));
     }
+    // 记录迁移已执行
+    database.prepare('INSERT OR IGNORE INTO schema_migrations (filename) VALUES (?)').run(file);
   }
 }
 
@@ -267,7 +285,7 @@ function ensureAllColumns(database) {
       updated_at    TEXT,
       deleted_at    TEXT
     )`);
-  } catch (_) {}
+  } catch (_) {} // CREATE TABLE IF NOT EXISTS — 安全网，不会触发
   ensureColumns(database, 'ai_service_configs', [
     { name: 'service_type',   type: 'TEXT NOT NULL DEFAULT \'text\'' },
     { name: 'provider',       type: 'TEXT DEFAULT \'\'' },
@@ -459,7 +477,7 @@ function ensureAllColumns(database) {
       proxy_url  TEXT NOT NULL,
       created_at TEXT NOT NULL
     )`);
-  } catch (_) {}
+  } catch (_) {} // CREATE TABLE IF NOT EXISTS — 安全网
   ensureColumns(database, 'image_proxy_cache', [
     { name: 'cache_key',  type: 'TEXT NOT NULL DEFAULT \'\'' },
     { name: 'proxy_url',  type: 'TEXT NOT NULL DEFAULT \'\'' },
@@ -478,7 +496,7 @@ function ensureAllColumns(database) {
       created_at     TEXT NOT NULL DEFAULT '',
       updated_at     TEXT NOT NULL DEFAULT ''
     )`);
-  } catch (_) {}
+  } catch (_) {} // CREATE TABLE IF NOT EXISTS — 安全网
   ensureColumns(database, 'ai_model_map', [
     { name: 'key',            type: 'TEXT NOT NULL DEFAULT \'\'' },
     { name: 'service_type',   type: 'TEXT NOT NULL DEFAULT \'text\'' },
@@ -497,7 +515,7 @@ function ensureAllColumns(database) {
       character_id   INTEGER NOT NULL,
       created_at     TEXT NOT NULL DEFAULT ''
     )`);
-  } catch (_) {}
+  } catch (_) {} // CREATE TABLE IF NOT EXISTS — 安全网
 
   // --- global_settings（全局键值设置表） ---
   try {
@@ -506,7 +524,7 @@ function ensureAllColumns(database) {
       value      TEXT NOT NULL DEFAULT '',
       updated_at TEXT NOT NULL DEFAULT ''
     )`);
-  } catch (_) {}
+  } catch (_) {} // CREATE TABLE IF NOT EXISTS — 安全网
 }
 
 /** 对已打开的 database 执行迁移与兜底补列（供 app 启动时调用） */

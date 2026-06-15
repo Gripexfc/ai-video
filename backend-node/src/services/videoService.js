@@ -92,19 +92,31 @@ async function downloadVideoToLocal(storagePath, videoUrl, videoGenId, log, proj
   if (!videoUrl || typeof videoUrl !== 'string') return null;
   const { dir, relPrefix } = resolveVideosDir(storagePath, projectSubdir);
   try {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    await fs.promises.mkdir(dir, { recursive: true });
     const ext = (videoUrl.split('?')[0].match(/\.(mp4|webm|mov)$/i) || [])[1] || 'mp4';
     const name = `vg_${videoGenId}_${randomUUID().slice(0, 8)}.${ext}`;
     const filePath = path.join(dir, name);
+    // 使用流式写入，避免大视频文件撑爆内存
     const res = await fetch(videoUrl, { method: 'GET' });
     if (!res.ok) {
       log.warn('Download video failed', { status: res.status, videoGenId });
       return null;
     }
-    const buf = Buffer.from(await res.arrayBuffer());
-    fs.writeFileSync(filePath, buf);
+    if (res.body && typeof res.body.pipe === 'function') {
+      // Node 18+ fetch 返回 Web Stream → 转为 Node Stream 写文件
+      const stream = require('stream');
+      const { pipeline } = require('stream/promises');
+      const nodeStream = stream.Readable.fromWeb(res.body);
+      const fileStream = fs.createWriteStream(filePath);
+      await pipeline(nodeStream, fileStream);
+    } else {
+      // 降级：无流式 API 时一次性写入（小文件兜底）
+      const buf = Buffer.from(await res.arrayBuffer());
+      fs.writeFileSync(filePath, buf);
+    }
     const relativePath = `${relPrefix}/${name}`.replace(/\\/g, '/');
-    log.info('Video saved to local', { videoGenId, local_path: relativePath, projectSubdir: projectSubdir || '(root)' });
+    const stats = await fs.promises.stat(filePath);
+    log.info('Video saved to local', { videoGenId, local_path: relativePath, size_mb: Math.round(stats.size / 1024 / 1024), projectSubdir: projectSubdir || '(root)' });
     return relativePath;
   } catch (e) {
     log.warn('Download video error', { videoGenId, error: e.message });
@@ -148,7 +160,9 @@ function targetVideoPixelsForAspect(aspectRatio) {
  * 用 ffmpeg 将视频缩放并加黑边到固定分辨率，避免 Grok 等返回实际像素不一致导致连播时画面跳动。
  */
 function normalizeVideoFileToTargetPixels(absPath, tw, th, log, videoGenId) {
-  if (!absPath || !tw || !th || !fs.existsSync(absPath)) return false;
+  if (!absPath || !tw || !th) return false;
+  // existsSync 保留：ffmpeg 操作前必须同步确认文件存在，避免 spawnSync 启动后文件已消失
+  if (!fs.existsSync(absPath)) return false;
   if (!hasLocalFfmpeg()) {
     log.info('[视频] 未找到 ffmpeg，跳过画幅归一化', { videoGenId });
     return false;
@@ -168,7 +182,7 @@ function normalizeVideoFileToTargetPixels(absPath, tw, th, log, videoGenId) {
     });
     try {
       fs.unlinkSync(tmpOut);
-    } catch (_) {}
+    } catch (e) { log.warn('File operation failed', { error: e.message }) }
     return false;
   }
   try {
@@ -180,7 +194,7 @@ function normalizeVideoFileToTargetPixels(absPath, tw, th, log, videoGenId) {
     log.warn('[视频] 替换归一化文件失败', { videoGenId, error: e.message });
     try {
       fs.unlinkSync(tmpOut);
-    } catch (_) {}
+    } catch (e2) { log.warn('File operation failed', { error: e2.message }) }
     return false;
   }
 }
@@ -219,7 +233,7 @@ async function processVideoGeneration(db, log, videoGenId) {
       try {
         reference_urls = JSON.parse(row.reference_image_urls);
         if (!Array.isArray(reference_urls)) reference_urls = null;
-      } catch (_) {}
+      } catch (_) { /* JSON.parse — 静默回退 */ }
     }
     // 优先使用分镜自身的镜头时长（storyboard.duration），其次用 video_generations.duration
     let effectiveDuration = row.duration || null;
@@ -245,7 +259,7 @@ async function processVideoGeneration(db, log, videoGenId) {
             aspectForVideo = videoClient.normalizeAspectRatioForApi(meta.aspect_ratio);
           }
         }
-      } catch (_) {}
+      } catch (_) { /* JSON.parse — 静默回退 */ }
     }
     const rowForAspect = { ...row, aspect_ratio: aspectForVideo || row.aspect_ratio };
     const result = await videoClient.callVideoApi(db, log, {
@@ -286,7 +300,7 @@ async function processVideoGeneration(db, log, videoGenId) {
         const projectSubdir = storageLayout.getProjectStorageSubdir(db, row.drama_id);
         localPath = await downloadVideoToLocal(storagePath, result.video_url, videoGenId, log, projectSubdir);
         maybeNormalizeVideoAfterDownload(storagePath, localPath, rowForAspect, videoGenId, log);
-      } catch (_) {}
+      } catch (e) { log.warn('Operation failed', { error: e.message }) }
       try {
         db.prepare(
           'UPDATE video_generations SET status = ?, video_url = ?, local_path = ?, completed_at = ?, updated_at = ? WHERE id = ?'
@@ -305,7 +319,7 @@ async function processVideoGeneration(db, log, videoGenId) {
             result.video_url, localPath, now2, row.storyboard_id
           );
           log.info('Updated storyboard video', { storyboard_id: row.storyboard_id, video_url: result.video_url });
-        } catch (_) {}
+        } catch (e) { log.warn('DB update failed', { error: e.message }) }
       }
       if (row.task_id) taskService.updateTaskResult(db, row.task_id, { video_generation_id: videoGenId, video_url: result.video_url, status: 'completed' });
       log.info('Video generation completed', { id: videoGenId, video_url: result.video_url, local_path: localPath });
@@ -345,7 +359,7 @@ async function processVideoGeneration(db, log, videoGenId) {
           const projectSubdir = storageLayout.getProjectStorageSubdir(db, row.drama_id);
           localPath = await downloadVideoToLocal(storagePath, pollResult.video_url, videoGenId, log, projectSubdir);
           maybeNormalizeVideoAfterDownload(storagePath, localPath, rowForAspect, videoGenId, log);
-        } catch (_) {}
+        } catch (e) { log.warn('Operation failed', { error: e.message }) }
         try {
           db.prepare(
             'UPDATE video_generations SET status = ?, video_url = ?, local_path = ?, completed_at = ?, updated_at = ? WHERE id = ?'
@@ -364,7 +378,7 @@ async function processVideoGeneration(db, log, videoGenId) {
               pollResult.video_url, localPath, now3, row.storyboard_id
             );
             log.info('Updated storyboard video (poll)', { storyboard_id: row.storyboard_id, video_url: pollResult.video_url });
-          } catch (_) {}
+          } catch (e) { log.warn('DB update failed', { error: e.message }) }
         }
         if (row.task_id) taskService.updateTaskResult(db, row.task_id, { video_generation_id: videoGenId, video_url: pollResult.video_url, status: 'completed' });
         log.info('Video generation completed (after poll)', { id: videoGenId, local_path: localPath });

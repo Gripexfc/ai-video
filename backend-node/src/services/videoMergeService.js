@@ -14,8 +14,14 @@ function list(db, query) {
     sql += ' AND drama_id = ?';
     params.push(query.drama_id);
   }
-  const rows = db.prepare('SELECT * ' + sql + ' ORDER BY created_at DESC').all(...params);
-  return rows.map(rowToItem);
+  // 分页支持：避免数据量大时返回全部记录
+  const countRow = db.prepare('SELECT COUNT(*) as total ' + sql).get(...params);
+  const total = countRow.total || 0;
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(query.page_size, 10) || 20));
+  const offset = (page - 1) * pageSize;
+  const rows = db.prepare('SELECT * ' + sql + ' ORDER BY created_at DESC LIMIT ? OFFSET ?').all(...params, pageSize, offset);
+  return { items: rows.map(rowToItem), total, page, pageSize };
 }
 
 function rowToItem(r) {
@@ -109,14 +115,22 @@ async function resolveVideoToLocalPath(videoUrl, baseUrl, storageRoot, tempDir, 
       return localPath;
     }
   }
-  // 4) 远程 URL：下载到 temp
+  // 4) 远程 URL：流式下载到 temp（避免大视频撑爆内存）
   const ext = u.includes('.mp4') ? '.mp4' : u.includes('.webm') ? '.webm' : '.mp4';
   const destPath = path.join(tempDir, `dl_${Date.now()}_${index}${ext}`);
   try {
     const res = await fetch(u, { method: 'GET' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const buf = Buffer.from(await res.arrayBuffer());
-    fs.writeFileSync(destPath, buf);
+    if (res.body && typeof res.body.pipe === 'function') {
+      const stream = require('stream');
+      const { pipeline } = require('stream/promises');
+      const nodeStream = stream.Readable.fromWeb(res.body);
+      const fileStream = fs.createWriteStream(destPath);
+      await pipeline(nodeStream, fileStream);
+    } else {
+      const buf = Buffer.from(await res.arrayBuffer());
+      fs.writeFileSync(destPath, buf);
+    }
     log.info('Video merge: downloaded to temp', { index, dest: destPath });
     return destPath;
   } catch (e) {

@@ -233,7 +233,7 @@ function getStoryboardsForEpisode(db, episodeId) {
       characters: (() => {
         if (!r.characters) return [];
         if (typeof r.characters !== 'string') return Array.isArray(r.characters) ? r.characters : [];
-        try { return JSON.parse(r.characters); } catch (_) { return []; }
+        try { return JSON.parse(r.characters); } catch (_) { return []; } // JSON.parse — 静默回退
       })(),
       composed_image: r.composed_image,
       video_url: r.video_url,
@@ -492,7 +492,7 @@ function updateStoryboardRowFromDerived(db, existingId, episodeIdNum, d, sb, now
       const insProp = db.prepare('INSERT OR IGNORE INTO storyboard_props (storyboard_id, prop_id) VALUES (?, ?)');
       for (const pid of d.propIds) insProp.run(existingId, pid);
     }
-  } catch (_) {}
+  } catch (e) { /* DB update — storyboard_props, 无 log 可用 */ }
 }
 
 /**
@@ -522,10 +522,10 @@ function insertOneStoryboard(db, episodeIdNum, sb, style, videoRatio, now, deriv
       try {
         const insProp = db.prepare('INSERT OR IGNORE INTO storyboard_props (storyboard_id, prop_id) VALUES (?, ?)');
         for (const pid of d.propIds) insProp.run(newId, pid);
-      } catch (_) {}
+      } catch (e) { /* DB insert — storyboard_props, 无 log 可用 */ }
     }
     return newId;
-  } catch (_) {
+  } catch (e) { /* DB insert — insertOneStoryboard 整体失败返回 null */
     return null;
   }
 }
@@ -551,15 +551,15 @@ function tryIncrementalSave(db, log, episodeIdNum, accumulated, savedNums, style
     let parsed = null;
     const repaired = repairTruncatedJsonArray(arrayCandidate);
     if (repaired) {
-      try { parsed = JSON.parse(repaired); } catch (_) {}
+      try { parsed = JSON.parse(repaired); } catch (_) {} // JSON.parse — 静默回退
       // 策略B：截断修复 + jsonrepair
       if (!parsed && safeJson._jsonrepair) {
-        try { parsed = JSON.parse(safeJson._jsonrepair(repaired)); } catch (_) {}
+        try { parsed = JSON.parse(safeJson._jsonrepair(repaired)); } catch (_) {} // JSON.parse — 静默回退
       }
     }
     // 策略C：直接 jsonrepair 整体修复
     if (!parsed && safeJson._jsonrepair) {
-      try { parsed = JSON.parse(safeJson._jsonrepair(arrayCandidate)); } catch (_) {}
+      try { parsed = JSON.parse(safeJson._jsonrepair(arrayCandidate)); } catch (_) {} // JSON.parse — 静默回退
     }
     if (!parsed) return;
     const items = Array.isArray(parsed) ? parsed : extractFirstArray(parsed);
@@ -578,7 +578,7 @@ function tryIncrementalSave(db, log, episodeIdNum, accumulated, savedNums, style
     if (newCount > 0) {
       log.info('Storyboard incremental save', { episode_id: episodeIdNum, new_count: newCount, total_saved: savedNums.size });
     }
-  } catch (_) { /* 流式解析错误静默忽略，等待最终完整解析 */ }
+  } catch (e) { log.warn('Incremental save failed', { error: e.message }) }
 }
 
 /**
@@ -625,7 +625,7 @@ function saveStoryboards(db, log, episodeId, storyboards, cfg, styleOverride, sk
         try {
           const propLinks = db.prepare('SELECT prop_id FROM storyboard_props WHERE storyboard_id = ?').all(refreshed.id);
           propIds = propLinks.map((p) => p.prop_id);
-        } catch (_) {}
+        } catch (e) { log.warn('DB update failed', { error: e.message }) }
         saved.push({
           id: refreshed.id,
           episode_id: episodeIdNum,
@@ -650,7 +650,7 @@ function saveStoryboards(db, log, episodeId, storyboards, cfg, styleOverride, sk
           segment_title: refreshed.segment_title ?? null,
           creation_mode: refreshed.creation_mode === 'universal' ? 'universal' : 'classic',
           universal_segment_text: refreshed.universal_segment_text ?? null,
-          characters: (() => { try { return JSON.parse(refreshed.characters || '[]'); } catch (_) { return []; } })(),
+          characters: (() => { try { return JSON.parse(refreshed.characters || '[]'); } catch (_) { return []; } })(), // JSON.parse — 静默回退
           prop_ids: propIds,
           status: refreshed.status,
           created_at: refreshed.created_at,
@@ -701,7 +701,7 @@ function saveStoryboards(db, log, episodeId, storyboards, cfg, styleOverride, sk
       try {
         const insProp = db.prepare('INSERT OR IGNORE INTO storyboard_props (storyboard_id, prop_id) VALUES (?, ?)');
         for (const pid of d.propIds) insProp.run(id, pid);
-      } catch (_) {}
+      } catch (e) { log.warn('DB update failed', { error: e.message }) }
     }
     saved.push({
       id,
@@ -1040,7 +1040,7 @@ async function processStoryboardGeneration(db, log, cfg, taskId, episodeId, mode
           });
           return;
         }
-      } catch (_) {}
+      } catch (e) { log.warn('Operation failed', { error: e.message }) }
     }
 
     taskService.updateTaskError(db, taskId, (err.message || '生成分镜头失败'));
@@ -1070,7 +1070,7 @@ function generateStoryboard(db, log, episodeId, model, style, storyboardCount, v
       if (meta && meta.aspect_ratio) dramaAspectRatio = meta.aspect_ratio;
       if (meta && meta.video_clip_duration) videoClipDuration = Number(meta.video_clip_duration) || null;
     }
-  } catch (_) {}
+  } catch (_) {} // JSON.parse — 静默回退
   const imageRatio = aspectRatio || dramaAspectRatio || cfg?.style?.default_video_ratio || '16:9';
 
   // 计算单镜建议时长（秒）：

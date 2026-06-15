@@ -1,0 +1,29 @@
+// ── SCSS Variables (编译期) ──────────────────────────
+// CSS custom properties (--*) 用于运行时切换主题
+// SCSS variables ($) 用于编译期复用和计算
+
+// Duration tokens — 简写
+$fast: 150ms;
+$normal: 250ms;
+$slow: 350ms;
+$ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+$spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+// Font stacks
+$font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'DM Sans', sans-serif;
+$font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+
+// Spacing (8pt grid)
+$space-xs: 4px;
+$space-sm: 8px;
+$space-md: 16px;
+$space-lg: 24px;
+$space-xl: 32px;
+$space-2xl: 48px;
+
+// Border Radius
+$radius-sm: 6px;
+$radius-md: 8px;
+$radius-lg: 12px;
+$radius-xl: 16px;
+$radius-2xl: 20px;

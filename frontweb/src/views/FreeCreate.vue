@@ -328,64 +328,122 @@ async function pollVideoTask(taskId, item) {
 </script>
 
 <style scoped>
+/* ── Free Create — Midnight Cinema ── */
+
 .free-create-page {
   min-height: 100vh;
-  background: #f5f7fa;
-  padding: 20px;
+  background: var(--bg-page);
+  padding: 28px 28px;
+  position: relative;
 }
 
 .page-header {
-  margin-bottom: 20px;
+  margin-bottom: 28px;
+  animation: fadeInUp 0.5s ease both;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
+  gap: 14px;
+  margin-bottom: 8px;
 }
 
 .page-title {
-  font-size: 22px;
-  font-weight: 600;
-  color: #1a1a2e;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-bright);
   margin: 0;
+  letter-spacing: -0.02em;
+  position: relative;
+  padding-bottom: 4px;
+}
+
+.page-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 32px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: var(--radius-sm);
 }
 
 .page-desc {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 14px;
   margin: 0;
 }
 
 .create-layout {
   display: flex;
-  gap: 20px;
+  gap: 24px;
   align-items: flex-start;
+  animation: fadeInUp 0.6s ease both;
+  animation-delay: 0.1s;
 }
 
+/* ── Glass Panel Shared ── */
 .input-panel {
-  width: 380px;
+  width: 400px;
   flex-shrink: 0;
-  background: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+  position: relative;
+  z-index: 1;
 }
 
+/* ── Mode Tabs ── */
 .mode-tabs {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
+.mode-tabs :deep(.el-tabs__header) {
+  margin-bottom: 0;
+}
+
+.mode-tabs :deep(.el-tabs__nav-wrap::after) {
+  background: var(--border-color);
+}
+
+.mode-tabs :deep(.el-tabs__active-bar) {
+  background: var(--accent);
+  height: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.mode-tabs :deep(.el-tabs__item) {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 14px;
+  transition: color var(--duration-fast) ease;
+}
+
+.mode-tabs :deep(.el-tabs__item.is-active) {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.mode-tabs :deep(.el-tabs__item:hover) {
+  color: var(--text-bright);
+}
+
+/* ── Form ── */
 .form-section {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .form-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #374151;
-  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .required {
@@ -394,6 +452,7 @@ async function pollVideoTask(taskId, item) {
 
 .prompt-input :deep(.el-textarea__inner) {
   font-size: 14px;
+  line-height: 1.65;
 }
 
 .form-row {
@@ -409,30 +468,33 @@ async function pollVideoTask(taskId, item) {
   width: 100%;
 }
 
+/* ── Ref Image Zone ── */
 .ref-image-zone {
-  border: 2px dashed #d1d5db;
-  border-radius: 8px;
-  padding: 20px;
+  border: 2px dashed var(--accent-border);
+  border-radius: var(--radius-md);
+  padding: 24px;
   text-align: center;
   cursor: pointer;
-  transition: border-color .2s;
-  min-height: 100px;
+  transition: border-color var(--duration-normal) ease, box-shadow var(--duration-normal) ease, background var(--duration-normal) ease;
+  min-height: 110px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   position: relative;
+  background: var(--accent-muted);
 }
 
 .ref-image-zone:hover {
-  border-color: #409eff;
+  border-color: var(--accent);
+  background: var(--accent-muted);
 }
 
 .ref-preview {
   max-width: 100%;
   max-height: 150px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .ref-actions {
@@ -440,40 +502,77 @@ async function pollVideoTask(taskId, item) {
 }
 
 .upload-icon {
-  font-size: 28px;
-  color: #9ca3af;
+  font-size: 32px;
+  color: var(--accent-border);
+  transition: color var(--duration-normal) ease;
+}
+
+.ref-image-zone:hover .upload-icon {
+  color: var(--accent);
 }
 
 .upload-tip {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--text-subtle);
 }
 
+/* ── Generate Button ── */
 .generate-btn {
   width: 100%;
-  margin-top: 4px;
+  margin-top: 6px;
+  height: 48px;
+  font-size: 15px;
+  font-weight: 700;
+  background: var(--accent) !important;
+  color: #1a1a1f !important;
+  border: none !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: 0 1px 4px var(--accent-glow) !important;
+  transition: box-shadow var(--duration-fast) ease !important;
+  letter-spacing: 0.01em;
 }
 
+.generate-btn:hover {
+  box-shadow: 0 2px 8px var(--accent-glow) !important;
+}
+
+.generate-btn:active {
+  transform: scale(0.99);
+}
+
+.generate-btn:disabled {
+  opacity: 0.5;
+  transform: none;
+  filter: none;
+}
+
+/* ── Result Panel ── */
 .result-panel {
   flex: 1;
-  background: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
-  min-height: 400px;
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+  min-height: 480px;
+  position: relative;
+  z-index: 1;
 }
 
 .result-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .result-title {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
-  color: #1a1a2e;
+  color: var(--text-bright);
+  letter-spacing: -0.01em;
 }
 
 .empty-result {
@@ -481,43 +580,60 @@ async function pollVideoTask(taskId, item) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 300px;
-  color: #9ca3af;
-  gap: 12px;
+  height: 340px;
+  color: var(--text-subtle);
+  gap: 14px;
 }
 
 .empty-icon {
-  font-size: 48px;
+  font-size: 52px;
+  opacity: 0.4;
+  animation: float 4s ease-in-out infinite;
 }
 
 .generating-tip {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: #409eff;
+  gap: 10px;
+  color: var(--accent);
   font-size: 14px;
-  margin-bottom: 12px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  background: var(--accent-muted);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-border);
 }
 
 .result-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
 }
 
+/* ── Result Item ── */
 .result-item {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  background: var(--bg-inner);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
   overflow: hidden;
+  transition: border-color var(--duration-normal) ease, box-shadow var(--duration-normal) ease;
+  animation: scaleIn 0.4s ease both;
+}
+
+.result-item:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-hover);
 }
 
 .result-media {
-  background: #f9fafb;
+  background: var(--bg-page);
   aspect-ratio: 16/9;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  position: relative;
 }
 
 .result-image {
@@ -525,6 +641,11 @@ async function pollVideoTask(taskId, item) {
   height: 100%;
   object-fit: cover;
   cursor: zoom-in;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.result-item:hover .result-image {
+  transform: scale(1.04);
 }
 
 .result-video {
@@ -538,8 +659,8 @@ async function pollVideoTask(taskId, item) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  color: #6b7280;
+  gap: 8px;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -548,12 +669,13 @@ async function pollVideoTask(taskId, item) {
 }
 
 .result-meta {
-  padding: 8px 10px;
+  padding: 10px 14px;
 }
 
 .result-prompt {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -561,26 +683,94 @@ async function pollVideoTask(taskId, item) {
 }
 
 .result-actions {
-  margin-top: 6px;
+  margin-top: 8px;
   display: flex;
   gap: 6px;
 }
 
+/* ── Image Preview Overlay ── */
 .image-preview-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.85);
+  background: rgba(0,0,0,0.85);
   z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: zoom-out;
+  animation: fadeIn 0.25s ease;
 }
 
 .preview-img {
   max-width: 90vw;
   max-height: 90vh;
   object-fit: contain;
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  animation: scaleIn 0.35s ease;
+}
+
+/* ── Light Mode Overrides ── */
+html.light .free-create-page {
+  background: var(--bg-page);
+}
+
+html.light .input-panel,
+html.light .result-panel {
+  background: var(--bg-card);
+  border-color: var(--glass-border);
+  box-shadow: var(--shadow-card);
+}
+
+html.light .input-panel::before,
+html.light .result-panel::before {
+  display: none;
+}
+
+html.light .page-title {
+  color: var(--text-bright);
+}
+
+html.light .page-title::after {
+  background: var(--accent);
+}
+
+html.light .ref-image-zone {
+  border-color: var(--accent-border);
+  background: var(--accent-muted);
+}
+
+html.light .ref-image-zone:hover {
+  background: var(--accent-soft);
+}
+
+html.light .generate-btn {
+  background: var(--accent) !important;
+  color: #fff !important;
+  box-shadow: 0 1px 4px rgba(176,136,40,0.15) !important;
+}
+
+html.light .result-item {
+  background: var(--bg-inner);
+  border-color: var(--glass-border);
+}
+
+html.light .result-item:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-hover);
+}
+
+html.light .image-preview-overlay {
+  background: rgba(248,246,241,0.92);
+}
+
+html.light .preview-img {
+  box-shadow: 0 16px 48px rgba(0,0,0,0.1);
+}
+
+html.light .generating-tip {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 </style>

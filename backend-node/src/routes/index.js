@@ -12,7 +12,7 @@ const propLibraryRoutes = require('./propLibrary');
 const characterRoutes = require('./characters');
 const uploadModule = require('./upload');
 const sceneRoutes = require('./scenes');
-const storyboardRoutes = require('./storyboards');
+const storyboardRoutes = require('./storyboards/index.js');
 const imageRoutes = require('./images');
 const videoRoutes = require('./videos');
 const videoMergeRoutes = require('./videoMerges');
@@ -20,9 +20,42 @@ const assetRoutes = require('./assets');
 const audioRoutes = require('./audio');
 const promptOverridesRoutes = require('./promptOverrides');
 const sceneModelMapRoutes = require('./sceneModelMap');
+const { createAuthRouter } = require('./auth');
+const { createCreditsRouter } = require('./credits');
+const { createAdminRouter } = require('./admin');
+const { selectiveAuth, withCredits, inferVideoOperation } = require('../middleware/routeCreditsGuard.js');
+
+/**
+ * 桌面端无积分/鉴权：用空壳替代 withCredits，直接透传 handler。
+ * 服务端正常使用积分扣费中间件。
+ */
+function wrapCredits(creditKey, inferFn) {
+  // 桌面端：直接透传，无积分扣费
+  if (isDesktopMode()) return (handler) => handler;
+  // 服务端：正常使用积分中间件
+  return withCredits(creditKey, inferFn);
+}
+
+function isDesktopMode() {
+  try {
+    const { loadConfig } = require('../config/index.js');
+    return (loadConfig().app?.mode || '').toLowerCase() === 'desktop';
+  } catch (_) {
+    return false;
+  }
+}
 
 function setupRouter(cfg, db, log) {
   const r = express.Router();
+
+  // 判断运行模式
+  const isDesktop = (cfg.app?.mode || '').toLowerCase() === 'desktop';
+
+  // 全局可选鉴权（白名单路径跳过，其他路径要求登录）— 仅服务端
+  if (!isDesktop) {
+    r.use(selectiveAuth);
+  }
+
   const drama = dramaRoutes(db, cfg, log);
   const task = taskRoutes(db, log);
   const settings = settingsRoutes(db, cfg, log);
@@ -66,7 +99,7 @@ function setupRouter(cfg, db, log) {
       }
       if (!text.trim()) return response.badRequest(res, '请上传小说文本文件或提供 text 参数');
       const title = req.body?.title || '';
-      const maxChapters = Number(req.body?.max_chapters) || 20;
+      const maxChapters = Math.min(100, Math.max(1, Number(req.body?.max_chapters) || 20));
       const aiSummarize = req.body?.ai_summarize === 'true' || req.body?.ai_summarize === true;
       const result = await novelImportService.importNovel(db, log, { text, title, maxChapters, aiSummarize });
       response.success(res, result);
@@ -99,8 +132,8 @@ function setupRouter(cfg, db, log) {
   r.put('/ai-configs/:id', aiConfig.update);
   r.delete('/ai-configs/:id', aiConfig.delete);
 
-  // ---------- generation (角色生成：AI + 入库 + 任务结果) ----------
-  r.post('/generation/characters', (req, res) => {
+  // ---------- generation (角色生成：AI + 入库 + 任务结果) ---------- 扣积分
+  r.post('/generation/characters', wrapCredits('text_gen')((req, res) => {
     const characterGenerationService = require('../services/characterGenerationService');
     try {
       const body = req.body || {};
@@ -113,10 +146,10 @@ function setupRouter(cfg, db, log) {
       log.error('generation/characters', { error: err.message });
       response.internalError(res, err.message || '创建任务失败');
     }
-  });
+  }));
 
-  // 故事生成：根据梗概 + 风格/类型 生成扩展剧本正文（不创建项目）
-  r.post('/generation/story', async (req, res) => {
+  // 故事生成：根据梗概 + 风格/类型 生成扩展剧本正文（不创建项目） 扣积分
+  r.post('/generation/story', wrapCredits('text_gen')(async (req, res) => {
     const storyGenerationService = require('../services/storyGenerationService');
     try {
       const body = req.body || {};
@@ -129,7 +162,7 @@ function setupRouter(cfg, db, log) {
       }
       response.internalError(res, err.message || '故事生成失败');
     }
-  });
+  }));
 
   // ---------- character-library ----------
   r.get('/character-library', charLibrary.list);
@@ -156,10 +189,10 @@ function setupRouter(cfg, db, log) {
   r.get('/characters/:id', characters.getOne);
   r.put('/characters/:id', characters.update);
   r.delete('/characters/:id', characters.delete);
-  r.post('/characters/batch-generate-images', characters.batchGenerateImages);
-  r.post('/characters/:id/generate-image', characters.generateImage);
-  r.post('/characters/:id/generate-four-view-image', characters.generateFourViewImage);
-  r.post('/characters/:id/generate-prompt', characters.generatePrompt);
+  r.post('/characters/batch-generate-images', wrapCredits('image_gen')(characters.batchGenerateImages));
+  r.post('/characters/:id/generate-image', wrapCredits('image_gen')(characters.generateImage));
+  r.post('/characters/:id/generate-four-view-image', wrapCredits('image_gen')(characters.generateFourViewImage));
+  r.post('/characters/:id/generate-prompt', wrapCredits('prompt_polish')(characters.generatePrompt));
   r.post('/characters/:id/upload-image', uploadModule.multerSingle, characters.uploadImage);
   r.put('/characters/:id/image', characters.putImage);
   r.put('/characters/:id/image-from-library', characters.imageFromLibrary);
@@ -175,8 +208,8 @@ function setupRouter(cfg, db, log) {
   r.post('/props', prop.createProp);
   r.put('/props/:id', prop.updateProp);
   r.delete('/props/:id', prop.deleteProp);
-  r.post('/props/:id/generate', prop.generateImage);
-  r.post('/props/:id/generate-prompt', prop.generatePropPrompt);
+  r.post('/props/:id/generate', wrapCredits('image_gen')(prop.generateImage));
+  r.post('/props/:id/generate-prompt', wrapCredits('prompt_polish')(prop.generatePropPrompt));
   r.post('/props/:id/add-to-library', prop.addToLibrary);
   r.post('/props/:id/add-to-material-library', prop.addToMaterialLibrary);
   r.post('/props/:id/extract-from-image', prop.extractPropFromImage);
@@ -203,7 +236,7 @@ function setupRouter(cfg, db, log) {
   // ---------- episodes ----------
   // 注意：drama.generateStoryboard 已处理所有逻辑（包括参数解析），这里统一使用 drama 模块的实现
   // 之前可能有部分路由指向了 storyboards.episodeStoryboardsGenerate，这可能导致参数解析不一致
-  r.post('/episodes/:episode_id/storyboards', drama.generateStoryboard);
+  r.post('/episodes/:episode_id/storyboards', wrapCredits('storyboard_gen')(drama.generateStoryboard));
   r.post('/episodes/:episode_id/props/extract', prop.extractProps);
   r.post('/episodes/:episode_id/characters/extract', stub.episodeCharactersExtract);
   r.get('/episodes/:episode_id/storyboards', storyboards.episodeStoryboardsGet);
@@ -220,16 +253,16 @@ function setupRouter(cfg, db, log) {
   r.put('/scenes/:scene_id', scenes.update);
   r.put('/scenes/:scene_id/prompt', scenes.updatePrompt);
   r.delete('/scenes/:scene_id', scenes.delete);
-  r.post('/scenes/generate-image', scenes.generateImage);
+  r.post('/scenes/generate-image', wrapCredits('image_gen')(scenes.generateImage));
   r.post('/scenes', scenes.create);
-  r.post('/scenes/:scene_id/generate-four-view-image', scenes.generateFourViewImage);
+  r.post('/scenes/:scene_id/generate-four-view-image', wrapCredits('image_gen')(scenes.generateFourViewImage));
   r.post('/scenes/:scene_id/add-to-library', scenes.addToLibrary);
   r.post('/scenes/:scene_id/add-to-material-library', scenes.addToMaterialLibrary);
   r.post('/scenes/:scene_id/extract-from-image', scenes.extractFromImage);
 
   // ---------- images ----------
   r.get('/images', images.list);
-  r.post('/images', images.create);
+  r.post('/images', wrapCredits('storyboard_image')(images.create));
   r.get('/images/episode/:episode_id/backgrounds', images.episodeBackgrounds);
   r.post('/images/episode/:episode_id/backgrounds/extract', images.episodeBackgroundsExtract);
   r.post('/images/episode/:episode_id/batch', images.episodeBatch);
@@ -240,15 +273,15 @@ function setupRouter(cfg, db, log) {
 
   // ---------- videos ----------
   r.get('/videos', videos.list);
-  r.post('/videos', videos.create);
-  r.post('/videos/image/:image_gen_id', videos.fromImage);
+  r.post('/videos', wrapCredits('video_gen_standard', inferVideoOperation)(videos.create));
+  r.post('/videos/image/:image_gen_id', wrapCredits('video_gen_standard', inferVideoOperation)(videos.fromImage));
   r.post('/videos/episode/:episode_id/batch', videos.episodeBatch);
   r.get('/videos/:id', videos.get);
   r.delete('/videos/:id', videos.delete);
 
   // ---------- video-merges ----------
   r.get('/video-merges', videoMerges.list);
-  r.post('/video-merges', videoMerges.create);
+  r.post('/video-merges', wrapCredits('tts')(videoMerges.create));
   r.get('/video-merges/:merge_id', videoMerges.get);
   r.delete('/video-merges/:merge_id', videoMerges.delete);
 
@@ -269,19 +302,19 @@ function setupRouter(cfg, db, log) {
   r.put('/storyboards/:id', storyboards.update);
   r.delete('/storyboards/:id', storyboards.delete);
   r.post('/storyboards/:id/props', prop.associateProps);
-  r.post('/storyboards/:id/frame-prompt', storyboards.framePrompt);
+  r.post('/storyboards/:id/frame-prompt', wrapCredits('prompt_polish')(storyboards.framePrompt));
   r.get('/storyboards/:id/frame-prompts', storyboards.framePromptsGet);
-  r.post('/storyboards/:id/polish-prompt', storyboards.polishPrompt);
-  r.post('/storyboards/:id/universal-segment-polish-stream', storyboards.polishUniversalSegmentStream);
-  r.post('/storyboards/:id/classic-video-prompt-polish-stream', storyboards.polishClassicVideoPromptStream);
-  r.post('/storyboards/:id/universal-segment-prompt-stream', storyboards.generateUniversalSegmentStream);
-  r.post('/storyboards/:id/universal-segment-prompt', storyboards.generateUniversalSegmentPrompt);
+  r.post('/storyboards/:id/polish-prompt', wrapCredits('prompt_polish')(storyboards.polishPrompt));
+  r.post('/storyboards/:id/universal-segment-polish-stream', wrapCredits('prompt_polish')(storyboards.polishUniversalSegmentStream));
+  r.post('/storyboards/:id/classic-video-prompt-polish-stream', wrapCredits('prompt_polish')(storyboards.polishClassicVideoPromptStream));
+  r.post('/storyboards/:id/universal-segment-prompt-stream', wrapCredits('prompt_polish')(storyboards.generateUniversalSegmentStream));
+  r.post('/storyboards/:id/universal-segment-prompt', wrapCredits('prompt_polish')(storyboards.generateUniversalSegmentPrompt));
   r.post('/storyboards/batch-infer-params', storyboards.batchInferParams);
   r.post('/storyboards/:id/upscale', storyboards.upscale);
 
   // ---------- audio ----------
-  r.post('/audio/extract', audio.extract);
-  r.post('/audio/extract/batch', audio.extractBatch);
+  r.post('/audio/extract', wrapCredits('tts')(audio.extract));
+  r.post('/audio/extract/batch', wrapCredits('tts')(audio.extractBatch));
 
   // ---------- settings ----------
   r.get('/settings/language', settings.getLanguage);
@@ -309,6 +342,25 @@ function setupRouter(cfg, db, log) {
     promptI18n.loadOverridesIntoCache(saved);
   } catch (e) {
     console.warn('Failed to load prompt overrides:', e.message);
+  }
+
+  // ---------- auth / credits / admin — 仅服务端 ----------
+  if (!isDesktop) {
+    r.use('/auth', createAuthRouter());
+    r.use('/credits', createCreditsRouter());
+    r.use('/admin', createAdminRouter());
+
+    // 公告（公开接口）
+    r.get('/announcements', (_req, res) => {
+      try {
+        const rows = db.prepare(
+          "SELECT * FROM announcements WHERE is_active = 1 AND (start_at IS NULL OR start_at <= datetime('now')) AND (end_at IS NULL OR end_at >= datetime('now')) ORDER BY created_at DESC"
+        ).all();
+        res.json({ success: true, data: rows });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
   }
 
   return r;

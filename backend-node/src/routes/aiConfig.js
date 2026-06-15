@@ -3,7 +3,7 @@ const response = require('../response');
 
 function list(db) {
   return (req, res) => {
-    const list = aiConfigService.listConfigs(db, req.query.service_type);
+    const list = aiConfigService.listConfigs(db, req.query.service_type, { maskKey: true });
     response.success(res, list);
   };
 }
@@ -12,7 +12,7 @@ function get(db) {
   return (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return response.badRequest(res, '无效的配置ID');
-    const config = aiConfigService.getConfig(db, id);
+    const config = aiConfigService.getConfig(db, id, { maskKey: true });
     if (!config) return response.notFound(res, '配置不存在');
     response.success(res, config);
   };
@@ -42,7 +42,7 @@ function create(db, log, cfg) {
         ...body,
         model: body.model ?? [],
       });
-      response.created(res, config);
+      response.created(res, config ? { ...config, api_key: config.api_key ? '****' + config.api_key.slice(-4) : null } : config);
     } catch (err) {
       log.errorw('Create AI config failed', { error: err.message });
       response.internalError(res, '创建失败');
@@ -67,7 +67,7 @@ function update(db, log, cfg) {
 
     const config = aiConfigService.updateConfig(db, log, id, body);
     if (!config) return response.notFound(res, '配置不存在');
-    response.success(res, config);
+    response.success(res, { ...config, api_key: config.api_key ? '****' + config.api_key.slice(-4) : null });
   };
 }
 

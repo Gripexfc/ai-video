@@ -3,8 +3,8 @@
     <header class="header">
       <div class="header-inner">
         <h1 class="logo" @click="router.push('/')">
-          <span class="logo-main">本地短剧助手</span>
-          <span class="logo-sub">LocalMiniDrama</span>
+          <img src="/logo.png" class="logo-icon" alt="logo" />
+          <span class="logo-main">视频miao~</span>
         </h1>
         <span class="breadcrumb-sep">›</span>
         <span class="page-title">{{ drama?.title || '剧集管理' }}</span>
@@ -26,7 +26,7 @@
     <main class="main" v-loading="loading">
       <!-- 基本信息 + 设置 -->
       <section class="section card">
-        <div class="section-title">剧集信息</div>
+        <div class="section-title">剧集信息<span v-if="saveStatus" class="save-indicator" :class="'save-' + saveStatus">{{ saveStatus === 'saving' ? '保存中...' : saveStatus === 'saved' ? '已保存' : '保存失败' }}</span></div>
         <el-form :model="infoForm" label-width="110px" label-position="left" class="info-form">
           <el-row :gutter="24">
             <el-col :span="12">
@@ -152,18 +152,18 @@
       <!-- 本剧资源库（Tab 切换） -->
       <section class="section card res-section">
         <nav class="res-tabbar">
-          <span class="res-tab-group-label">资源库</span>
+          <span class="res-tab-group-label">全局素材库</span>
           <button
-            v-for="t in [{v:'lib-char',label:'角色'},{v:'lib-scene',label:'场景'},{v:'lib-prop',label:'道具'}]"
+            v-for="t in [{v:'lib-char',label:'全局角色'},{v:'lib-scene',label:'全局场景'},{v:'lib-prop',label:'全局道具'}]"
             :key="t.v"
             class="res-tab res-tab--lib"
             :class="{ active: activeResTab === t.v }"
             @click="activeResTab = t.v"
           >{{ t.label }}</button>
           <span class="res-tab-spacer"></span>
-          <span class="res-tab-group-label res-tab-group-label--prod">制作资源</span>
+          <span class="res-tab-group-label res-tab-group-label--prod">本剧素材</span>
           <button
-            v-for="t in [{v:'drama-char',label:'角色'},{v:'drama-scene',label:'场景'},{v:'drama-prop',label:'道具'}]"
+            v-for="t in [{v:'drama-char',label:'本剧角色'},{v:'drama-scene',label:'本剧场景'},{v:'drama-prop',label:'本剧道具'}]"
             :key="t.v"
             class="res-tab res-tab--drama"
             :class="{ active: activeResTab === t.v }"
@@ -557,12 +557,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch, computed } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, VideoPlay, Plus, Delete, Sunny, Moon, PictureFilled } from '@element-plus/icons-vue'
 import EpisodeBatchImportDialog from '@/components/EpisodeBatchImportDialog.vue'
 import { useTheme } from '@/composables/useTheme'
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch'
 import { dramaAPI } from '@/api/drama'
 import { characterLibraryAPI } from '@/api/characterLibrary'
 import { sceneLibraryAPI } from '@/api/sceneLibrary'
@@ -574,6 +575,7 @@ import { characterAPI } from '@/api/characters'
 import { sceneAPI } from '@/api/scenes'
 import { propAPI } from '@/api/props'
 import { stylePromptMetadataForSave, backfillDramaStylePromptMetadataIfNeeded } from '@/constants/styleOptions'
+import { assetImageUrl } from '@/utils/assetImageUrl'
 
 const route = useRoute()
 const { isDark, toggle: toggleTheme } = useTheme()
@@ -881,13 +883,6 @@ const nextEpisodeNumber = computed(() => (
 
 const infoForm = reactive({ title: '', description: '', genre: '', style: '', aspect_ratio: '16:9' })
 
-function assetImageUrl(item) {
-  if (!item) return ''
-  const lp = item.local_path && String(item.local_path).trim()
-  if (lp) return '/static/' + lp.replace(/^\//, '')
-  return item.image_url || ''
-}
-
 function formatDate(val) {
   if (!val) return ''
   return new Date(val).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -913,9 +908,12 @@ async function loadDrama() {
 }
 
 let infoSaveTimer = null
+let saveStatusTimer = null
+const saveStatus = ref('') // '' | 'saving' | 'saved' | 'error'
 function saveInfo() {
   if (infoSaveTimer) clearTimeout(infoSaveTimer)
   infoSaveTimer = setTimeout(async () => {
+    saveStatus.value = 'saving'
     try {
       await dramaAPI.update(dramaId, { title: infoForm.title, description: infoForm.description })
       await dramaAPI.saveOutline(dramaId, {
@@ -926,8 +924,14 @@ function saveInfo() {
           aspect_ratio: infoForm.aspect_ratio || '16:9',
         },
       })
+      saveStatus.value = 'saved'
+      if (saveStatusTimer) clearTimeout(saveStatusTimer)
+      saveStatusTimer = setTimeout(() => { saveStatus.value = '' }, 2000)
     } catch (e) {
       console.error('saveInfo failed', e)
+      saveStatus.value = 'error'
+      if (saveStatusTimer) clearTimeout(saveStatusTimer)
+      saveStatusTimer = setTimeout(() => { saveStatus.value = '' }, 3000)
     }
   }, 600)
 }
@@ -940,9 +944,9 @@ function goEpisode(epId) {
   router.push(`/film/${dramaId}?episode=${epId}`)
 }
 
+const EP_STATUS_MAP = { draft: '草稿', processing: '生成中', completed: '已完成', failed: '失败' }
 function epStatusLabel(status) {
-  const map = { draft: '草稿', processing: '生成中', completed: '已完成', failed: '失败' }
-  return map[status] || status
+  return EP_STATUS_MAP[status] || status
 }
 
 async function onBatchImportEpisodes(importedEpisodes) {
@@ -1020,7 +1024,7 @@ function openPreview(url) { if (url) previewUrl.value = url }
 
 // 角色
 const charList = ref([]), charLoading = ref(false), charPage = ref(1), charPageSize = ref(20), charTotal = ref(0), charKw = ref('')
-let charKwTimer = null
+const { trigger: debouncedOnCharKw } = useDebouncedSearch(() => { charPage.value = 1; loadCharList() }, 300)
 async function loadCharList() {
   charLoading.value = true
   try {
@@ -1028,7 +1032,7 @@ async function loadCharList() {
     charList.value = res?.items ?? []; charTotal.value = res?.pagination?.total ?? 0
   } catch { charList.value = [] } finally { charLoading.value = false }
 }
-function onCharKwInput() { if (charKwTimer) clearTimeout(charKwTimer); charKwTimer = setTimeout(() => { charPage.value = 1; loadCharList() }, 300) }
+function onCharKwInput() { debouncedOnCharKw() }
 const editCharVisible = ref(false), editCharForm = ref(null), editCharSaving = ref(false)
 function openEditChar(item) {
   editCharForm.value = { id: item.id, name: item.name ?? '', category: item.category ?? '', description: item.description ?? '', tags: item.tags ?? '', image_url: item.image_url ?? '', local_path: item.local_path ?? null, imgUploading: false, imgGenerating: false }
@@ -1048,7 +1052,7 @@ async function deleteChar(item) {
 
 // 场景
 const sceneList = ref([]), sceneLoading = ref(false), scenePage = ref(1), scenePageSize = ref(20), sceneTotal = ref(0), sceneKw = ref('')
-let sceneKwTimer = null
+const { trigger: debouncedOnSceneKw } = useDebouncedSearch(() => { scenePage.value = 1; loadSceneList() }, 300)
 async function loadSceneList() {
   sceneLoading.value = true
   try {
@@ -1056,7 +1060,7 @@ async function loadSceneList() {
     sceneList.value = res?.items ?? []; sceneTotal.value = res?.pagination?.total ?? 0
   } catch { sceneList.value = [] } finally { sceneLoading.value = false }
 }
-function onSceneKwInput() { if (sceneKwTimer) clearTimeout(sceneKwTimer); sceneKwTimer = setTimeout(() => { scenePage.value = 1; loadSceneList() }, 300) }
+function onSceneKwInput() { debouncedOnSceneKw() }
 const editSceneVisible = ref(false), editSceneForm = ref(null), editSceneSaving = ref(false)
 function openEditScene(item) {
   editSceneForm.value = { id: item.id, location: item.location ?? '', time: item.time ?? '', category: item.category ?? '', description: item.description ?? '', tags: item.tags ?? '', image_url: item.image_url ?? '', local_path: item.local_path ?? null, imgUploading: false, imgGenerating: false }
@@ -1077,7 +1081,7 @@ async function deleteScene(item) {
 
 // 道具
 const propList = ref([]), propLoading = ref(false), propPage = ref(1), propPageSize = ref(20), propTotal = ref(0), propKw = ref('')
-let propKwTimer = null
+const { trigger: debouncedOnPropKw } = useDebouncedSearch(() => { propPage.value = 1; loadPropList() }, 300)
 async function loadPropList() {
   propLoading.value = true
   try {
@@ -1085,7 +1089,7 @@ async function loadPropList() {
     propList.value = res?.items ?? []; propTotal.value = res?.pagination?.total ?? 0
   } catch { propList.value = [] } finally { propLoading.value = false }
 }
-function onPropKwInput() { if (propKwTimer) clearTimeout(propKwTimer); propKwTimer = setTimeout(() => { propPage.value = 1; loadPropList() }, 300) }
+function onPropKwInput() { debouncedOnPropKw() }
 const editPropVisible = ref(false), editPropForm = ref(null), editPropSaving = ref(false)
 function openEditProp(item) {
   editPropForm.value = { id: item.id, name: item.name ?? '', category: item.category ?? '', description: item.description ?? '', tags: item.tags ?? '', image_url: item.image_url ?? '', local_path: item.local_path ?? null, imgUploading: false, imgGenerating: false }
@@ -1113,7 +1117,7 @@ const importPageSize = ref(20)
 const importTotal = ref(0)
 const importKw = ref('')
 const importingId = ref(null)
-let importKwTimer = null
+const { trigger: debouncedOnImportKw } = useDebouncedSearch(() => { importPage.value = 1; loadImportList() }, 300)
 
 function openImport(type) {
   importType.value = type
@@ -1135,8 +1139,7 @@ async function loadImportList() {
 }
 
 function onImportKwInput() {
-  if (importKwTimer) clearTimeout(importKwTimer)
-  importKwTimer = setTimeout(() => { importPage.value = 1; loadImportList() }, 300)
+  debouncedOnImportKw()
 }
 
 async function doImport(item) {
@@ -1196,6 +1199,12 @@ watch(activeResTab, (tab) => {
   else if (tab === 'lib-prop') loadPropList()
 })
 
+onBeforeUnmount(() => {
+  // 清理所有防抖/延迟计时器，防止组件卸载后仍触发回调
+  if (infoSaveTimer) clearTimeout(infoSaveTimer)
+  if (saveStatusTimer) clearTimeout(saveStatusTimer)
+})
+
 onMounted(() => {
   loadDrama()
   loadCharList()
@@ -1208,327 +1217,649 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* =====================================================
+   DramaDetail — Midnight Cinema Design System
+   ===================================================== */
+
+/* ── Page root ── */
 .drama-detail {
   min-height: 100vh;
-  background: #0f0f12;
-  background-image:
-    radial-gradient(ellipse 80% 50% at 20% -20%, rgba(120, 60, 220, 0.18) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(60, 100, 220, 0.12) 0%, transparent 60%);
-  color: #e4e4e7;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  position: relative;
 }
+
+/* ── Sticky header ── */
 .header {
-  background: rgba(18, 18, 22, 0.82);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(139, 92, 246, 0.18);
+  background: var(--bg-card-solid);
+  border-bottom: 1px solid var(--border-color);
   padding: 12px 24px;
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow);
+  transition: background var(--duration-normal) ease, border-color var(--duration-normal) ease;
 }
-html.light .drama-detail {
-  background: #f5f3ff;
-  background-image:
-    radial-gradient(ellipse 80% 50% at 20% -20%, rgba(139, 92, 246, 0.12) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(99, 102, 241, 0.08) 0%, transparent 60%);
+html.light .header {
+  background: var(--bg-card-solid) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  box-shadow: var(--shadow);
 }
-html.light .drama-detail .header {
-  background: rgba(255, 255, 255, 0.85) !important;
-  border-bottom-color: rgba(139, 92, 246, 0.2) !important;
-  box-shadow: 0 2px 16px rgba(139, 92, 246, 0.08) !important;
-}
+
+/* ── Logo ── */
 .logo {
   margin: 0;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: center;
+  gap: 8px;
   line-height: 1;
-  transition: filter 0.3s;
+  transition: filter var(--duration-fast) ease;
 }
-.logo:hover { filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.5)); }
+.logo:hover {
+  filter: brightness(1.05);
+}
+.logo-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  box-shadow: var(--shadow);
+  transition: box-shadow var(--duration-normal) ease;
+}
+.logo:hover .logo-icon {
+  box-shadow: var(--shadow-hover);
+}
 .logo-main {
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #c4b5fd 0%, #818cf8 50%, #a78bfa 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--accent);
+  letter-spacing: -0.02em;
 }
-.logo-sub {
-  font-size: 0.68rem;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  color: #6d6d7a;
-  -webkit-text-fill-color: #6d6d7a;
+
+/* ── Header layout ── */
+.header-inner {
+  max-width: min(1200px, 96vw);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
-html.light .drama-detail .logo-main {
-  background: linear-gradient(135deg, #7c3aed, #6366f1);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-html.light .drama-detail .logo-sub {
-  color: #9ca3af;
-  -webkit-text-fill-color: #9ca3af;
-}
-.header-inner { max-width: min(1200px, 96vw); margin: 0 auto; display: flex; align-items: center; gap: 16px; }
 .breadcrumb-sep {
-  color: #3f3f46;
+  color: var(--text-faint);
   font-size: 1rem;
   font-weight: 300;
   flex-shrink: 0;
   user-select: none;
 }
-html.light .breadcrumb-sep { color: #d1d5db; }
+
+/* ── Page title pill ── */
 .page-title {
   font-size: 0.88rem;
   font-weight: 500;
-  color: #a1a1aa;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 3px 10px;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 4px 14px;
   max-width: 220px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 html.light .page-title {
-  color: #6b7280;
-  background: rgba(99, 102, 241, 0.06);
-  border-color: rgba(99, 102, 241, 0.15);
+  background: var(--bg-hover);
+  border-color: var(--border-color);
 }
-.btn-back-list {
+
+/* ── Buttons ── */
+.btn-back-list, .btn-theme {
+  flex-shrink: 0;
+  background: var(--bg-card-solid) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-muted) !important;
+  border-radius: var(--radius-md) !important;
+  transition: border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) ease !important;
+}
+.btn-back-list:hover, .btn-theme:hover {
+  border-color: var(--accent-border) !important;
+  color: var(--accent) !important;
+  box-shadow: var(--shadow-hover);
+}
+html.light .btn-back-list, html.light .btn-theme {
+  background: var(--bg-card-solid) !important;
+}
+
+/* ── Header actions ── */
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
   flex-shrink: 0;
 }
-.header-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; }
-.main { max-width: min(1200px, 96vw); margin: 0 auto; padding: 24px 16px 48px; display: flex; flex-direction: column; gap: 20px; }
+
+/* ── Main content ── */
+.main {
+  max-width: min(1200px, 96vw);
+  margin: 0 auto;
+  padding: 28px 16px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: fadeIn 0.4s ease both;
+}
+
+/* ── Section cards ── */
 .section.card {
-  background: rgba(24, 24, 27, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(63, 63, 70, 0.7);
-  border-radius: 16px;
-  padding: 20px 24px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
-  transition: box-shadow 0.3s, border-color 0.3s;
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 24px 28px;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--duration-normal) ease, border-color var(--duration-normal) ease;
+  animation: fadeIn 0.4s ease both;
+  position: relative;
 }
 .section.card:hover {
-  border-color: rgba(139, 92, 246, 0.25);
-  box-shadow: 0 6px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(139, 92, 246, 0.08);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--accent-border);
 }
 html.light .section.card {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(139, 92, 246, 0.15);
-  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.06);
+  background: var(--bg-card-solid) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: var(--shadow-card) !important;
 }
-html.light .section.card:hover {
-  border-color: rgba(139, 92, 246, 0.3);
-  box-shadow: 0 6px 28px rgba(139, 92, 246, 0.1);
-}
-.section-title { font-size: 1rem; font-weight: 600; color: #fafafa; margin-bottom: 16px; }
-html.light .section-title { color: #18181b; }
-.section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.section-header .section-title { margin-bottom: 0; }
-.section-count { color: #71717a; font-size: 0.85rem; }
-.info-form { max-width: 100%; }
-.empty-tip { color: #71717a; text-align: center; padding: 32px; }
 
-/* 分集卡片 */
-.episode-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+/* ── Section title with accent bar ── */
+.section-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  letter-spacing: -0.01em;
+}
+.section-title::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 1.1em;
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+/* ── Section header ── */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.section-header .section-title { margin-bottom: 0; }
+.section-count {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  background: var(--accent-soft);
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+.info-form { max-width: 100%; }
+.empty-tip {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 40px 20px;
+  font-size: 0.9rem;
+  background: var(--bg-inner);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-color);
+}
+
+/* ── Episode grid ── */
+.episode-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+/* ── Episode card ── */
 .episode-card {
-  background: rgba(28, 28, 30, 0.8);
-  border: 1px solid rgba(63, 63, 70, 0.6);
-  border-radius: 12px;
-  padding: 16px;
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 18px;
   cursor: pointer;
-  transition: border-color 0.25s, transform 0.2s, box-shadow 0.25s, background 0.2s;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
-}
-.episode-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.06), transparent 60%);
-  opacity: 0;
-  transition: opacity 0.25s;
+  animation: fadeIn 0.3s ease both;
 }
 .episode-card:hover {
-  border-color: rgba(139, 92, 246, 0.5);
-  background: rgba(35, 35, 38, 0.9);
-  transform: translateY(-3px);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(139, 92, 246, 0.15);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-hover);
 }
-.episode-card:hover::before { opacity: 1; }
 .episode-card:hover .episode-enter {
-  color: var(--el-color-primary);
+  color: var(--accent);
   opacity: 1;
 }
 .episode-card:hover .episode-enter-icon {
-  transform: translateX(3px);
+  transform: translateX(4px);
 }
-.episode-enter {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid #27272a;
-  font-size: 0.78rem;
-  color: #52525b;
+html.light .episode-card {
+  background: var(--bg-card-solid) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* ── Episode card inner ── */
+.episode-card-header {
   display: flex;
   align-items: center;
-  gap: 4px;
-  opacity: 0.7;
-  transition: color 0.2s, opacity 0.2s;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.episode-num {
+  font-size: 0.82rem;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.episode-title {
+  font-weight: 500;
+  color: var(--text-bright);
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.95rem;
+}
+.episode-preview {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 10px;
+}
+.episode-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ep-stat { font-size: 0.72rem; color: var(--text-muted); }
+.ep-stat-num {
+  color: var(--accent2);
+  font-weight: 600;
+}
+.ep-stat--status {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+/* ── Status badges ── */
+.ep-status--draft {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ep-status--processing {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+}
+.ep-status--completed {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+.ep-status--failed {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* ── Episode enter ── */
+.episode-enter {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0.6;
+  transition: color var(--duration-fast) ease, opacity var(--duration-fast) ease;
 }
 .episode-enter-icon {
   font-size: 0.85rem;
-  transition: transform 0.2s;
+  transition: transform var(--duration-fast) ease;
 }
-.episode-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.episode-num { font-size: 0.8rem; color: #71717a; }
-.episode-title { font-weight: 500; color: #fafafa; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.episode-preview { font-size: 0.78rem; color: #71717a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 8px; }
-.episode-stats { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.ep-stat { font-size: 0.72rem; color: #71717a; }
-.ep-stat-num { color: #38bdf8; font-weight: 600; }
-.ep-stat--status { padding: 1px 7px; border-radius: 99px; font-size: 0.7rem; }
-.ep-status--draft { background: rgba(113,113,122,0.15); color: #a1a1aa; }
-.ep-status--processing { background: rgba(234,179,8,0.12); color: #fcd34d; }
-.ep-status--completed { background: rgba(34,197,94,0.12); color: #4ade80; }
-.ep-status--failed { background: rgba(239,68,68,0.12); color: #f87171; }
 
-/* 资源库 */
-.library-toolbar { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
-.import-tip { font-size: 0.8rem; color: #71717a; }
+/* ── Library toolbar ── */
+.library-toolbar {
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.import-tip {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
 .import-list { max-height: 480px; }
-.library-list { min-height: 120px; display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; }
-.library-item { display: flex; gap: 12px; padding: 10px; background: #1c1c1e; border: 1px solid #27272a; border-radius: 8px; }
-.library-item-cover { width: 72px; height: 72px; flex-shrink: 0; border-radius: 6px; overflow: hidden; background: #27272a; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.library-item-cover img { width: 100%; height: 100%; object-fit: cover; }
-.library-placeholder { font-size: 0.8rem; color: #71717a; }
-.library-item-info { flex: 1; min-width: 0; }
-.library-item-name { font-weight: 500; color: #fafafa; margin-bottom: 4px; }
-.library-item-desc { font-size: 0.85rem; color: #a1a1aa; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.library-item-actions { display: flex; gap: 8px; }
-.library-empty { text-align: center; color: #71717a; padding: 40px 20px; }
-.library-pagination { margin-top: 12px; display: flex; justify-content: center; }
+.library-list {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
 
-/* ——— 编辑器风格 Tab 栏 ——— */
+/* ── Library item ── */
+.library-item {
+  display: flex;
+  gap: 14px;
+  padding: 12px;
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+.library-item:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-hover);
+}
+html.light .library-item {
+  background: var(--bg-inner) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* ── Library item cover ── */
+.library-item-cover {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-inner);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+.library-item-cover:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-hover);
+}
+.library-item-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.library-placeholder {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.library-item-info { flex: 1; min-width: 0; }
+.library-item-name {
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 4px;
+}
+.library-item-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.library-item-actions { display: flex; gap: 8px; }
+.library-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 20px;
+  font-size: 0.88rem;
+}
+.library-pagination {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Resource tab bar ── */
 .res-section { padding-bottom: 0 !important; }
 .res-tabbar {
   display: flex;
   align-items: center;
   gap: 0;
-  border-bottom: 1px solid var(--border-color, #27272a);
+  border-bottom: 1px solid var(--border-color);
   padding: 0 4px;
   overflow-x: auto;
   scrollbar-width: none;
-  margin: -4px -20px 0;
-  padding-left: 20px;
+  margin: -4px -28px 0;
+  padding-left: 28px;
 }
 .res-tabbar::-webkit-scrollbar { display: none; }
 .res-tab-group-label {
   font-size: 11px;
-  color: var(--text-faint, #52525b);
-  padding: 0 8px 0 4px;
+  color: var(--text-faint);
+  padding: 0 10px 0 4px;
   white-space: nowrap;
   user-select: none;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   align-self: center;
 }
-.res-tab-group-label--prod { color: #a78bfa; }
+.res-tab-group-label--prod {
+  color: var(--accent);
+}
 .res-tab-spacer {
   flex: 1;
   min-width: 40px;
 }
+
+/* ── Resource tabs — pill style ── */
 .res-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 9px 16px 8px;
+  padding: 10px 18px 10px;
   font-size: 13px;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--text-muted);
   background: transparent;
   border: none;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s, background 0.15s;
+  transition: color var(--duration-fast) ease, background var(--duration-fast) ease;
   flex-shrink: 0;
   outline: none;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 .res-tab::after {
   content: '';
   position: absolute;
   bottom: -1px;
-  left: 0;
-  right: 0;
+  left: 16px;
+  right: 16px;
   height: 2px;
-  border-radius: 2px 2px 0 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   background: transparent;
-  transition: background 0.15s;
+  transition: background var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
-.res-tab:hover { color: var(--text-primary); background: var(--bg-inner, rgba(255,255,255,0.04)); }
-/* 资源库激活 */
-.res-tab--lib.active { color: #60a5fa; font-size: 14px; font-weight: 600; }
-.res-tab--lib.active::after { background: #60a5fa; }
-/* 制作资源激活 */
-.res-tab--drama.active { color: #a78bfa; font-size: 14px; font-weight: 600; }
-.res-tab--drama.active::after { background: #a78bfa; }
+.res-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
 
-html.light .episode-card { background: rgba(255, 255, 255, 0.85); border-color: rgba(139, 92, 246, 0.12); }
-html.light .episode-card:hover { background: rgba(245, 243, 255, 0.95); border-color: rgba(139, 92, 246, 0.4); box-shadow: 0 8px 24px rgba(139, 92, 246, 0.12); }
-html.light .episode-card::before { background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), transparent 60%); }
-html.light .episode-enter { border-top-color: #e4e4e7; color: #a1a1aa; }
-html.light .episode-card:hover .episode-enter { color: var(--el-color-primary); }
-html.light .episode-title { color: #18181b; }
-html.light .res-tab:hover { background: rgba(0,0,0,0.04); }
-html.light .res-tab--lib.active { color: #2563eb; }
-html.light .res-tab--lib.active::after { background: #2563eb; }
-html.light .res-tab--drama.active { color: #7c3aed; }
-html.light .res-tab--drama.active::after { background: #7c3aed; }
+/* ── Library tabs active (accent2) ── */
+.res-tab--lib.active {
+  color: var(--accent2);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.res-tab--lib.active::after {
+  background: var(--accent2);
+}
 
-/* 本剧制作资源列表 */
-.drama-res-list { display: flex; flex-wrap: wrap; gap: 12px; padding: 4px 0 8px; }
-.drama-res-item { display: flex; gap: 12px; width: calc(50% - 6px); background: var(--bg-inner, #1c1c1e); border: 1px solid var(--border-color, #27272a); border-radius: 8px; padding: 10px; box-sizing: border-box; }
-.drama-res-cover { width: 72px; height: 72px; border-radius: 6px; overflow: hidden; flex-shrink: 0; cursor: zoom-in; background: var(--bg-page, #0f0f12); display: flex; align-items: center; justify-content: center; }
-.drama-res-cover img { width: 100%; height: 100%; object-fit: cover; }
-.drama-res-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.drama-res-name { font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ── Drama tabs active (accent) ── */
+.res-tab--drama.active {
+  color: var(--accent);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.res-tab--drama.active::after {
+  background: var(--accent);
+}
+
+/* ── Drama resource list ── */
+.drama-res-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 6px 0 10px;
+}
+
+/* ── Drama resource item ── */
+.drama-res-item {
+  display: flex;
+  gap: 14px;
+  width: calc(50% - 6px);
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  box-sizing: border-box;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+.drama-res-item:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-hover);
+}
+html.light .drama-res-item {
+  background: var(--bg-inner) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* ── Drama resource cover ── */
+.drama-res-cover {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+  cursor: zoom-in;
+  background: var(--bg-inner);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.drama-res-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.drama-res-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.drama-res-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .drama-res-meta { display: flex; gap: 4px; flex-wrap: wrap; }
-.drama-res-desc { font-size: 12px; color: var(--text-secondary, #a1a1aa); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.drama-res-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .drama-res-actions { margin-top: 6px; }
 
-/* 编辑弹框内图片区 */
+/* ── Image editor (dialog) ── */
 .lib-img-editor { display: flex; align-items: center; gap: 14px; }
-.lib-img-thumb { width: 88px; height: 88px; border-radius: 8px; overflow: hidden; cursor: zoom-in; background: var(--bg-inner, #1c1c1e); border: 1px solid var(--border-color, #27272a); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.lib-img-thumb {
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: zoom-in;
+  background: var(--bg-inner);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 .lib-img-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.lib-img-empty { color: var(--text-faint, #52525b); font-size: 26px; }
+.lib-img-empty {
+  color: var(--text-faint);
+  font-size: 26px;
+}
 .lib-img-btns { display: flex; flex-direction: column; gap: 8px; }
 
-/* 图片预览 */
-.image-preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: flex; align-items: center; justify-content: center; z-index: 9999; cursor: zoom-out; }
-.image-preview-img { max-width: 90vw; max-height: 90vh; border-radius: 8px; object-fit: contain; }
-
-/* 主题切换按钮 */
-.btn-theme {
-  --el-button-bg-color: rgba(148, 163, 184, 0.1);
-  --el-button-border-color: rgba(148, 163, 184, 0.3);
-  --el-button-text-color: #94a3b8;
-  --el-button-hover-bg-color: rgba(148, 163, 184, 0.2);
-  --el-button-hover-border-color: rgba(148, 163, 184, 0.5);
-  --el-button-hover-text-color: #cbd5e1;
-  transition: all 0.2s;
+/* ── Image preview overlay ── */
+.image-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  cursor: zoom-out;
+  animation: fadeIn 0.2s ease both;
 }
-html.light .btn-theme {
-  --el-button-bg-color: rgba(99, 102, 241, 0.08);
-  --el-button-border-color: rgba(99, 102, 241, 0.3);
-  --el-button-text-color: #6366f1;
-  --el-button-hover-bg-color: rgba(99, 102, 241, 0.15);
-  --el-button-hover-border-color: rgba(99, 102, 241, 0.5);
-  --el-button-hover-text-color: #4f46e5;
+.image-preview-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: var(--radius-lg);
+  object-fit: contain;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  animation: fadeIn 0.25s ease both;
+}
+
+/* ── Light mode overrides for cards ── */
+html.light .episode-title { color: var(--text-bright) !important; }
+html.light .library-item-name { color: var(--text-bright) !important; }
+html.light .drama-res-name { color: var(--text-primary) !important; }
+
+/* ── Save indicator ── */
+.save-indicator {
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: 12px;
+  opacity: 0;
+  animation: saveFadeIn 0.2s ease forwards;
+}
+.save-saving { color: var(--text-muted); }
+.save-saved { color: #4ade80; }
+.save-error { color: #f87171; }
+@keyframes saveFadeIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 </style>

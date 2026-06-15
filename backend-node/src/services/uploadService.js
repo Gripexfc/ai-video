@@ -14,13 +14,15 @@ function downloadBufferViaNodeHttp(url, timeoutMs = 30000, redirectCount = 0) {
     if (redirectCount > 5) return reject(new Error('Too many redirects'));
     const parsed = new URL(url);
     const mod = parsed.protocol === 'https:' ? https : http;
+    // 最大下载大小：50MB（防止内存溢出）
+    const MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024;
     const options = {
       hostname: parsed.hostname,
       port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
       path: parsed.pathname + parsed.search,
       method: 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; LocalMiniDrama/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; ShortDramaCreator/1.0)',
         'Accept': 'image/*,*/*',
       },
       timeout: timeoutMs,
@@ -38,7 +40,16 @@ function downloadBufferViaNodeHttp(url, timeoutMs = 30000, redirectCount = 0) {
         return reject(new Error(`HTTP ${res.statusCode}`));
       }
       const chunks = [];
-      res.on('data', (chunk) => chunks.push(chunk));
+      let totalBytes = 0;
+      res.on('data', (chunk) => {
+        totalBytes += chunk.length;
+        if (totalBytes > MAX_DOWNLOAD_BYTES) {
+          req.destroy();
+          reject(new Error(`Download exceeds ${MAX_DOWNLOAD_BYTES / 1024 / 1024}MB limit`));
+          return;
+        }
+        chunks.push(chunk);
+      });
       res.on('end', () => resolve({ buffer: Buffer.concat(chunks), contentType: res.headers['content-type'] || '' }));
       res.on('error', reject);
     });
@@ -54,6 +65,11 @@ function ensureDir(dir) {
   }
 }
 
+/** 异步版 ensureDir */
+async function ensureDirAsync(dir) {
+  await fs.promises.mkdir(dir, { recursive: true });
+}
+
 /** @returns {{ dir: string, relPrefix: string }} */
 function resolveCategoryPaths(storagePath, category, projectSubdir) {
   const sub = projectSubdir && String(projectSubdir).trim();
@@ -64,7 +80,7 @@ function resolveCategoryPaths(storagePath, category, projectSubdir) {
   return { dir: path.join(storagePath, category), relPrefix: category };
 }
 
-function uploadFile(storagePath, baseUrl, log, fileBuffer, originalName, mimeType, category, projectSubdir = null) {
+async function uploadFile(storagePath, baseUrl, log, fileBuffer, originalName, mimeType, category, projectSubdir = null) {
   const { dir: categoryPath, relPrefix } = resolveCategoryPaths(storagePath, category, projectSubdir);
   ensureDir(categoryPath);
   const ext = path.extname(originalName) || '.png';
@@ -92,7 +108,7 @@ async function downloadImageToLocal(storagePath, imageUrl, category, log, prefix
   if (!imageUrl || typeof imageUrl !== 'string') return null;
   const { dir: categoryPath, relPrefix } = resolveCategoryPaths(storagePath, category, projectSubdir);
   try {
-    ensureDir(categoryPath);
+    await ensureDirAsync(categoryPath);
     let buffer;
     let ext = 'png';
     if (imageUrl.startsWith('data:')) {
@@ -128,7 +144,7 @@ async function downloadImageToLocal(storagePath, imageUrl, category, log, prefix
     }
     const name = `${prefix}${prefix ? '_' : ''}${randomUUID().slice(0, 8)}.${ext}`;
     const filePath = path.join(categoryPath, name);
-    fs.writeFileSync(filePath, buffer);
+    await fs.promises.writeFile(filePath, buffer);
     const relativePath = `${relPrefix}/${name}`.replace(/\\/g, '/');
     log.info('Image saved to local', { category, local_path: relativePath, projectSubdir: projectSubdir || '(root)' });
     return relativePath;
@@ -199,7 +215,12 @@ async function uploadLocalImageToProxy(storagePath, localPathOrUrl, log, tag) {
       // localhost URL → 提取 /static/ 后的相对路径
       const afterStatic = localPathOrUrl.split('/static/')[1];
       if (afterStatic && storagePath) {
-        filePath = path.join(storagePath, afterStatic.replace(/^\//, ''));
+        const resolved = path.resolve(storagePath, afterStatic.replace(/^\//, ''));
+        if (!resolved.startsWith(path.resolve(storagePath))) {
+          log.warn('[图床上传] 路径遍历检测，已拒绝', { tag, afterStatic });
+          return null;
+        }
+        filePath = resolved;
       }
     } else if (localPathOrUrl && storagePath) {
       filePath = path.isAbsolute(localPathOrUrl)

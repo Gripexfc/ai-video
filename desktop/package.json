@@ -1,9 +1,8 @@
 {
   "name": "localminidrama-desktop",
   "version": "1.2.6",
-  "description": "LocalMiniDrama 本地桌面客户端",
+  "description": "本地 AI 短剧创作工具桌面客户端",
   "main": "main.js",
-  "author": "LocalMiniDrama",
   "license": "MIT",
   "scripts": {
     "prestart": "node scripts/copy-backend.js",
@@ -37,8 +36,8 @@
   },
   "build": {
     "appId": "com.localminidrama.desktop",
-    "productName": "本地短剧助手",
-    "artifactName": "LocalMiniDrama ${version}.${ext}",
+    "productName": "视频miao~",
+    "artifactName": "视频miao~ ${version}.${ext}",
     "directories": {
       "output": "release"
     },

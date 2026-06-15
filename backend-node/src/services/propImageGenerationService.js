@@ -38,7 +38,7 @@ async function processPropImageGeneration(db, log, taskId, propId, opts) {
     try {
       const dr = db.prepare('SELECT style, metadata FROM dramas WHERE id = ? AND deleted_at IS NULL').get(prop.drama_id);
       cfg = mergeCfgStyleWithDrama(cfg, dr || {});
-    } catch (_) {}
+    } catch (e) { log.warn('Operation failed', { error: e.message }) }
   }
   const styleOverride = (opts && opts.style) ? String(opts.style).trim() : '';
   const baseStyle = styleOverride || (cfg?.style?.default_style_en || cfg?.style?.default_style || '');
@@ -56,7 +56,7 @@ async function processPropImageGeneration(db, log, taskId, propId, opts) {
         const meta = typeof dramaRow.metadata === 'string' ? JSON.parse(dramaRow.metadata) : dramaRow.metadata;
         if (meta && meta.aspect_ratio) imageSize = aspectRatioToSize(meta.aspect_ratio);
       }
-    } catch (_) {}
+    } catch (_) { /* JSON.parse — 静默回退 */ }
   }
   if (!imageSize) imageSize = cfg?.style?.default_image_size || '1920x1920';
   const fullPrompt = appendPrompt(String(prop.prompt).trim(), style);
@@ -81,7 +81,7 @@ async function processPropImageGeneration(db, log, taskId, propId, opts) {
     taskService.updateTaskError(db, taskId, errMsg);
     try {
       db.prepare('UPDATE props SET error_msg = ?, updated_at = ? WHERE id = ?').run(errMsg, new Date().toISOString(), propId);
-    } catch (_) {}
+    } catch (e) { log.warn('DB update failed', { error: e.message }) }
     return;
   }
 
@@ -89,7 +89,7 @@ async function processPropImageGeneration(db, log, taskId, propId, opts) {
     taskService.updateTaskError(db, taskId, result.error);
     try {
       db.prepare('UPDATE props SET error_msg = ?, updated_at = ? WHERE id = ?').run(result.error, new Date().toISOString(), propId);
-    } catch (_) {}
+    } catch (e) { log.warn('DB update failed', { error: e.message }) }
     return;
   }
   if (!result.image_url) {
@@ -97,7 +97,7 @@ async function processPropImageGeneration(db, log, taskId, propId, opts) {
     taskService.updateTaskError(db, taskId, errMsg);
     try {
       db.prepare('UPDATE props SET error_msg = ?, updated_at = ? WHERE id = ?').run(errMsg, new Date().toISOString(), propId);
-    } catch (_) {}
+    } catch (e) { log.warn('DB update failed', { error: e.message }) }
     return;
   }
 
@@ -117,14 +117,14 @@ async function processPropImageGeneration(db, log, taskId, propId, opts) {
       'prop_' + propId,
       projectSubdir
     );
-  } catch (_) {}
+  } catch (e) { log.warn('Operation failed', { error: e.message }) }
 
   const now = new Date().toISOString();
   // 旧图追加到 extra_images，与上传逻辑保持一致
   const oldProp = db.prepare('SELECT local_path, image_url, extra_images FROM props WHERE id = ?').get(propId);
   const oldPath = oldProp?.local_path || oldProp?.image_url || '';
   let extras = [];
-  try { extras = oldProp?.extra_images ? JSON.parse(oldProp.extra_images) : []; } catch (_) {}
+  try { extras = oldProp?.extra_images ? JSON.parse(oldProp.extra_images) : []; } catch (_) { /* JSON.parse — 静默回退 */ }
   if (!Array.isArray(extras)) extras = [];
   if (oldPath && !extras.includes(oldPath)) extras.push(oldPath);
   const extraJson = extras.length ? JSON.stringify(extras) : null;

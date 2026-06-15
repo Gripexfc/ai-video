@@ -1,0 +1,111 @@
+// ── Design Tokens (CSS Custom Properties) ──────────
+// 运行时切换暗/亮主题，必须用 CSS custom properties
+@use '../abstracts/variables' as *;
+// 运行时切换暗/亮主题，必须用 CSS custom properties
+
+:root {
+  // Spacing (8pt grid)
+  --space-xs:  #{$space-xs};
+  --space-sm:  #{$space-sm};
+  --space-md:  #{$space-md};
+  --space-lg:  #{$space-lg};
+  --space-xl:  #{$space-xl};
+  --space-2xl: #{$space-2xl};
+
+  // Border Radius
+  --radius-sm:  #{$radius-sm};
+  --radius-md:  #{$radius-md};
+  --radius-lg:  #{$radius-lg};
+  --radius-xl:  #{$radius-xl};
+  --radius-2xl: #{$radius-2xl};
+
+  // Motion
+  --duration-fast:   #{$fast};
+  --duration-normal: #{$normal};
+  --duration-slow:   #{$slow};
+  --ease-default:    #{$ease};
+  --ease-spring:     #{$spring};
+}
+
+// ── Dark mode (default) ────────────────────────────
+:root,
+html.dark {
+  --bg-page:       #000000;
+  --bg-card:       rgba(28, 28, 30, 0.85);
+  --bg-card-solid: #1c1c1e;
+  --bg-inner:      rgba(38, 38, 40, 0.6);
+  --bg-hover:      rgba(255, 255, 255, 0.08);
+  --bg-active:     rgba(255, 255, 255, 0.12);
+
+  --text-primary:  rgba(255, 255, 255, 0.92);
+  --text-bright:   #ffffff;
+  --text-muted:    rgba(255, 255, 255, 0.68);  // improved from 0.60
+  --text-subtle:   rgba(255, 255, 255, 0.50);  // improved from 0.40
+  --text-faint:    rgba(255, 255, 255, 0.22);
+
+  --border-color:  rgba(255, 255, 255, 0.10);
+  --border-muted:  rgba(255, 255, 255, 0.06);
+
+  --shadow:        0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 3px rgba(0, 0, 0, 0.14);
+  --shadow-hover:  0 4px 12px rgba(0, 0, 0, 0.32), 0 1px 3px rgba(0, 0, 0, 0.18);
+  --shadow-card:   0 1px 3px rgba(0, 0, 0, 0.20), 0 1px 6px rgba(0, 0, 0, 0.12);
+
+  --accent:        #d4a24e;
+  --accent-soft:   rgba(212, 162, 78, 0.14);
+  --accent-muted:  rgba(212, 162, 78, 0.06);
+  --accent-border: rgba(212, 162, 78, 0.28);
+  --accent-glow:   rgba(212, 162, 78, 0.10);
+  --accent-dim:    #b08530;
+
+  --accent2:       #6eb0e8;
+  --accent2-soft:  rgba(110, 176, 232, 0.10);
+
+  --glass-bg:      rgba(28, 28, 30, 0.85);
+  --glass-border:  rgba(255, 255, 255, 0.08);
+  --glass-blur:    blur(20px);
+
+  --gradient-page:   #000000;
+  --gradient-accent: var(--accent);
+  --gradient-glow:   transparent;
+}
+
+// ── Light mode ─────────────────────────────────────
+html.light {
+  --bg-page:       #f5f5f7;
+  --bg-card:       rgba(255, 255, 255, 0.92);
+  --bg-card-solid: #ffffff;
+  --bg-inner:      rgba(242, 242, 247, 0.85);
+  --bg-hover:      rgba(0, 0, 0, 0.04);
+  --bg-active:     rgba(0, 0, 0, 0.08);
+
+  --text-primary:  rgba(0, 0, 0, 0.85);
+  --text-bright:   #000000;
+  --text-muted:    rgba(0, 0, 0, 0.55);
+  --text-subtle:   rgba(0, 0, 0, 0.35);
+  --text-faint:    rgba(0, 0, 0, 0.18);
+
+  --border-color:  rgba(0, 0, 0, 0.10);
+  --border-muted:  rgba(0, 0, 0, 0.06);
+
+  --shadow:        0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+  --shadow-hover:  0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-card:   0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 4px rgba(0, 0, 0, 0.02);
+
+  --accent:        #b08828;
+  --accent-soft:   rgba(176, 136, 40, 0.12);
+  --accent-muted:  rgba(176, 136, 40, 0.06);
+  --accent-border: rgba(176, 136, 40, 0.22);
+  --accent-glow:   rgba(176, 136, 40, 0.08);
+  --accent-dim:    #9a7224;
+
+  --accent2:       #4a90c4;
+  --accent2-soft:  rgba(74, 144, 196, 0.08);
+
+  --glass-bg:      rgba(255, 255, 255, 0.85);
+  --glass-border:  rgba(0, 0, 0, 0.06);
+  --glass-blur:    blur(20px);
+
+  --gradient-page:   #f5f5f7;
+  --gradient-accent: var(--accent);
+  --gradient-glow:   transparent;
+}

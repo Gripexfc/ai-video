@@ -98,7 +98,7 @@ function fitAudioToSlot(inputPath, slotSec, outPath, log) {
   try {
     fs.copyFileSync(inputPath, outPath);
     return true;
-  } catch (_) {
+  } catch (_) { // fs.copyFileSync — 静默回退到 ffmpeg
     return runFfmpeg(
       ['-y', '-i', inputPath, '-t', String(slotSec), '-c:a', 'libmp3lame', '-q:a', '4', outPath],
       log,
@@ -123,7 +123,7 @@ function concatMp3List(segmentPaths, outPath, log) {
   } finally {
     try {
       if (fs.existsSync(listFile)) fs.unlinkSync(listFile);
-    } catch (_) {}
+    } catch (e) { log.warn('File operation failed', { error: e.message }) }
   }
 }
 

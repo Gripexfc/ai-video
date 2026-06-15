@@ -1,10 +1,10 @@
 <div align="center">
 
-# 🎬 本地短剧助手
+# 🎬 视频miao~
 
 **本地 AI 短剧 & 漫剧生成工具 —— 下载即用，完全开源，数据不出本机**
 
-*LocalMiniDrama · AI-powered short drama creator*
+*视频miao~ · AI-powered short drama creator*
 
 [![version](https://img.shields.io/badge/version-1.2.6-blue?style=flat-square)](../../releases)
 [![license](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
@@ -12,10 +12,7 @@
 [![stack](https://img.shields.io/badge/Vue3%20%2B%20Node.js%20%2B%20Electron-informational?style=flat-square)](#)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](../../pulls)
 
-**[English](docs/en.md) | 简体中文 | [作者故事](docs/story.md)**
-
-[![GitHub](https://img.shields.io/badge/GitHub-xuanyustudio%2FLocalMiniDrama-181717?logo=github&style=flat-square)](https://github.com/xuanyustudio/LocalMiniDrama)
-[![Gitee](https://img.shields.io/badge/Gitee-bi__shang__a%2Flocalminidrama-C71D23?logo=gitee&style=flat-square)](https://gitee.com/bi_shang_a/localminidrama)
+**[English](docs/en.md) | 简体中文**
 
 </div>
 
@@ -140,15 +137,15 @@
 | 文件名 | 说明 | 推荐人群 |
 |--------|------|----------|
 
-| `本地短剧助手 x.x.x.exe` | 标准版免安装便携版 | 首次使用，含示例项目 |
+| `视频miao~ x.x.x.exe` | 标准版免安装便携版 | 首次使用，含示例项目 |
 
-| `本地短剧助手-Lite-x.x.x.exe` | Lite 版免安装便携版 | 已熟悉使用，包体更小 |
+| `视频miao~-Lite-x.x.x.exe` | Lite 版免安装便携版 | 已熟悉使用，包体更小 |
 
 > **标准版 vs Lite 版**：标准版内置一个示例短剧项目，打开即可查看完整创作流程示例，适合新手上手参考；Lite 版不含示例数据，包体更小，适合已了解使用方式的用户。功能完全一致。
 
 双击运行 → 在软件「AI 配置」页填入你的 API Key → 开始创作。
 
-> 首次运行会在 `%APPDATA%\LocalMiniDrama\backend\configs\config.yaml` 生成配置文件。
+> 首次运行会在 `%APPDATA%\视频miao~\backend\configs\config.yaml` 生成配置文件。
 
 ### 方式二：开发模式运行
 
@@ -156,9 +153,8 @@
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/xuanyustudio/LocalMiniDrama.git
-# 或 Gitee：git clone https://gitee.com/bi_shang_a/localminidrama.git
-cd LocalMiniDrama
+git clone https://github.com/your-repo/视频miao~.git
+cd 视频miao~
 
 # 2. 启动后端（默认端口 5679）
 cd backend-node
@@ -202,7 +198,7 @@ npm run dev
 ## 🏗 项目架构
 
 ```
-LocalMiniDrama/
+视频miao~/
 ├── backend-node/          # Node.js 后端（Express + SQLite）
 │   ├── src/
 │   │   ├── config/        # 配置加载（YAML）
@@ -267,7 +263,7 @@ LocalMiniDrama/
 - 🔧 **图片下载稳定性**：打包 exe 环境下的图片下载从 `fetch` 改为 Node.js `http/https` 模块，支持重试与超时，解决 `fetch failed` 问题
 
 **v1.1.14 亮点：**
-- 🆕 **官方仓库链接**：README 及后端文档新增 [GitHub](https://github.com/xuanyustudio/LocalMiniDrama) 与 [Gitee](https://gitee.com/bi_shang_a/localminidrama) 官方仓库徽章，方便提交 Issue 或 PR
+- 🆕 **官方仓库链接**：README 及后端文档新增官方仓库徽章链接，方便提交 Issue 或 PR
 
 **v1.1.13 亮点：**
 - 🆕 **分镜图相机角度视角修正**：分镜 `angle` 字段翻译为相机透视描述注入提示词，使 AI 生成画面视角与镜头设定一致
@@ -333,31 +329,6 @@ LocalMiniDrama/
 
 ---
 
-## 💬 联系 & 社区
-
-一个游戏搬砖工，用自己熟悉的 JavaScript 做了这个开源项目，先做了再说。
-
-想了解项目诞生的完整故事？👉 [作者故事 & 碎碎念](docs/story.md)
-
-有任何建议、交流、合作，欢迎加微信，或扫码加入**用户交流群**：
-
-<table>
-  <tr>
-    <td align="center">
-      <img src="项目截图/wx.jpg" alt="作者微信" width="180"/><br/>
-      <sub>加作者微信</sub>
-    </td>
-    <td align="center">
-      <img src="项目截图/微信群.jpg" alt="微信交流群" width="180"/><br/>
-      <sub>扫码进群（二维码定期更新）</sub>
-    </td>
-  </tr>
-</table>
-
-> 微信群二维码有效期约 7 天，过期请加作者微信拉入群。
-
----
-
 ## 📄 License
 
 [MIT](LICENSE)
@@ -366,6 +337,6 @@ LocalMiniDrama/
 
 <div align="center">
 
-**如果这个项目对你有帮助，请点一下 ⭐ Star，这是对作者最大的鼓励！**
+**如果这个项目对你有帮助，请点一下 ⭐ Star，感谢你的支持！**
 
 </div>

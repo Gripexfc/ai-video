@@ -1,0 +1,53 @@
+// ── Utilities ──────────────────────────────────────
+@use '../abstracts/mixins' as *;
+
+// Text hierarchy
+h1 { font-size: 28px !important; }
+h2 { font-size: 22px !important; }
+h3 { font-size: 17px !important; }
+h4 { font-size: 15px !important; }
+h5 { font-size: 14px !important; }
+p     { line-height: 1.6 !important; }
+small { font-size: 12px !important; }
+
+// Selection
+::selection {
+  background: rgba(212, 162, 78, 0.22);
+  color: #fff;
+}
+::-moz-selection {
+  background: rgba(212, 162, 78, 0.25);
+  color: #fff;
+}
+html.light ::selection {
+  background: rgba(176, 136, 40, 0.16);
+  color: inherit;
+}
+
+// Focus ring — Apple style
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-radius: var(--radius-sm);
+}
+
+// macOS Vibrancy — Electron titlebar
+.electron-drag     { -webkit-app-region: drag; }
+.electron-no-drag  { -webkit-app-region: no-drag; }
+
+// Page transitions
+.page-fade-enter-active { animation: fadeInUp var(--duration-normal) ease both; }
+.page-fade-leave-active { animation: fadeIn var(--duration-fast) ease reverse both; }
+
+// Disabled state
+[disabled], .is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+// Textarea resize
+textarea { resize: vertical; }
+
+// Shared button utilities
+.btn-action         { @include btn-action; }
+.btn-action-primary { @include btn-action-primary; }

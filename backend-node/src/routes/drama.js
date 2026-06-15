@@ -15,7 +15,7 @@ function createDrama(db, log) {
       response.created(res, drama);
     } catch (err) {
       log.error('Create drama failed', { error: err.message, stack: err.stack });
-      response.internalError(res, err.message || '创建失败');
+      response.internalError(res, '创建失败');
     }
   };
 }
@@ -164,7 +164,7 @@ function exportDrama(db, cfg, log) {
       res.send(buffer);
     } catch (err) {
       log.error('Export drama failed', { error: err.message });
-      response.internalError(res, err.message || '导出失败');
+      response.internalError(res, '导出失败');
     }
   };
 }
@@ -182,7 +182,7 @@ function importDrama(db, cfg, log) {
       if (err.message && (err.message.includes('格式') || err.message.includes('缺少') || err.message.includes('损坏'))) {
         return response.badRequest(res, err.message);
       }
-      response.internalError(res, err.message || '导入失败');
+      response.internalError(res, '导入失败');
     }
   };
 }
@@ -236,7 +236,7 @@ function importExample(db, cfg, log) {
       response.created(res, result);
     } catch (err) {
       log.error('Import example failed', { error: err.message });
-      response.internalError(res, err.message || '导入示例失败');
+      response.internalError(res, '导入示例失败');
     }
   };
 }
@@ -260,7 +260,7 @@ function generateStoryboard(db, log) {
       response.success(res, resData);
     } catch (err) {
       log.error('Generate storyboard failed', { error: err.message });
-      response.internalError(res, err.message || '生成分镜失败');
+      response.internalError(res, '生成分镜失败');
     }
   };
 }

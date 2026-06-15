@@ -207,14 +207,14 @@ onMounted(() => load())
   width: 220px;
   flex-shrink: 0;
   background: var(--bg-card, #fff);
-  border-right: 1px solid var(--border-color, #e4e4e7);
+  border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
 }
 
 .sidebar-header {
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color, #e4e4e7);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .sidebar-title {
@@ -243,11 +243,11 @@ onMounted(() => load())
 }
 
 .menu-item.active {
-  background: var(--el-color-primary-light-9, #f3e8ff);
+  background: var(--el-color-primary-light-9, #f6f4f0);
 }
 
 .menu-item.active .menu-label {
-  color: var(--el-color-primary, #7c3aed);
+  color: var(--el-color-primary, #c47a3a);
   font-weight: 600;
 }
 
@@ -290,17 +290,17 @@ onMounted(() => load())
 .page-desc {
   margin: 0 0 20px;
   font-size: 13px;
-  color: var(--text-muted, #71717a);
+  color: var(--text-muted);
   line-height: 1.6;
   padding: 10px 14px;
   background: var(--bg-inner, #f8f8f8);
   border-radius: 8px;
-  border-left: 3px solid var(--el-color-primary, #7c3aed);
+  border-left: 3px solid var(--el-color-primary, #c47a3a);
 }
 
 .prompt-card {
   background: var(--bg-card, #fff);
-  border: 1px solid var(--border-color, #e4e4e7);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 20px;
 }
@@ -329,7 +329,7 @@ onMounted(() => load())
 .prompt-desc {
   margin: 0;
   font-size: 12px;
-  color: var(--text-muted, #71717a);
+  color: var(--text-muted);
 }
 
 .section-label {
@@ -339,11 +339,11 @@ onMounted(() => load())
   margin-bottom: 8px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--text-muted, #71717a);
+  color: var(--text-muted);
 }
 
 .section-label--locked {
-  color: #2563eb;
+  color: #5ea8d4;
 }
 
 .section-icon {
@@ -365,13 +365,13 @@ onMounted(() => load())
 }
 
 .locked-content {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background: #f0f7fa;
+  border: 1px solid #b3cdd9;
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 12px;
   font-family: 'Consolas', 'Monaco', monospace;
-  color: #1e40af;
+  color: #2a6e8a;
   white-space: pre-wrap;
   line-height: 1.6;
   user-select: none;
@@ -382,6 +382,6 @@ onMounted(() => load())
   gap: 8px;
   justify-content: flex-end;
   padding-top: 16px;
-  border-top: 1px solid var(--border-color, #e4e4e7);
+  border-top: 1px solid var(--border-color);
 }
 </style>

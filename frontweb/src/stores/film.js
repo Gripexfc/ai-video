@@ -1,12 +1,42 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+
+const STORAGE_KEY = 'film-store-persist'
+
+function loadPersistedState() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+function persistState(state) {
+  try {
+    const data = {
+      storyInput: state.storyInput,
+      scriptContent: state.scriptContent,
+      videoResolution: state.videoResolution,
+    }
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch { /* ignore quota errors */ }
+}
+
+function clearPersistedState() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY)
+  } catch { /* ignore */ }
+}
 
 export const useFilmStore = defineStore('film', () => {
+  const saved = loadPersistedState()
   const drama = ref(null)
   const currentEpisode = ref(null)
-  const storyInput = ref('')
-  const scriptContent = ref('')
-  const videoResolution = ref('720p')
+  const storyInput = ref(saved?.storyInput ?? '')
+  const scriptContent = ref(saved?.scriptContent ?? '')
+  const videoResolution = ref(saved?.videoResolution ?? '720p')
   const videoProgress = ref(0)
   const videoStatus = ref('idle') // idle | generating | done | error
 
@@ -48,7 +78,13 @@ export const useFilmStore = defineStore('film', () => {
     scriptContent.value = ''
     videoProgress.value = 0
     videoStatus.value = 'idle'
+    clearPersistedState()
   }
+
+  // 自动持久化关键字段
+  watch([storyInput, scriptContent, videoResolution], () => {
+    persistState({ storyInput: storyInput.value, scriptContent: scriptContent.value, videoResolution: videoResolution.value })
+  })
 
   return {
     drama,

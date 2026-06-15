@@ -186,34 +186,72 @@ function listDramas(db, query) {
     'SELECT * ' + sql + ' ORDER BY updated_at DESC LIMIT ? OFFSET ?'
   ).all(...params, pageSize, offset);
   const dramas = list.map((r) => rowToDrama(r));
-  for (const d of dramas) {
-    const episodes = db.prepare(
-      'SELECT * FROM episodes WHERE drama_id = ? AND deleted_at IS NULL ORDER BY episode_number ASC'
-    ).all(d.id);
-    d.episodes = episodes.map((e) => {
+
+  // 批量查询优化：一次取所有 drama 的 episodes 和 storyboards，避免 N+1
+  if (dramas.length > 0) {
+    const dramaIds = dramas.map((d) => d.id);
+    const dPlaceholders = dramaIds.map(() => '?').join(',');
+
+    // 批量获取所有 episodes
+    const allEpisodes = db.prepare(
+      `SELECT * FROM episodes WHERE drama_id IN (${dPlaceholders}) AND deleted_at IS NULL ORDER BY episode_number ASC`
+    ).all(...dramaIds);
+
+    // 批量获取所有 storyboards
+    const episodeIds = allEpisodes.map((e) => e.id);
+    let allStoryboards = [];
+    let allSbProps = [];
+    if (episodeIds.length > 0) {
+      const ePlaceholders = episodeIds.map(() => '?').join(',');
+      allStoryboards = db.prepare(
+        `SELECT * FROM storyboards WHERE episode_id IN (${ePlaceholders}) AND deleted_at IS NULL ORDER BY storyboard_number ASC`
+      ).all(...episodeIds);
+
+      // 批量获取 storyboard_props
+      if (allStoryboards.length > 0) {
+        const sbIds = allStoryboards.map((s) => s.id);
+        const sbPlaceholders = sbIds.map(() => '?').join(',');
+        try {
+          allSbProps = db.prepare(
+            `SELECT storyboard_id, prop_id FROM storyboard_props WHERE storyboard_id IN (${sbPlaceholders})`
+          ).all(...sbIds);
+        } catch (_) {}
+      }
+    }
+
+    // 构建 storyboard_props 映射
+    const spMap = {};
+    for (const row of allSbProps) {
+      if (!spMap[row.storyboard_id]) spMap[row.storyboard_id] = [];
+      spMap[row.storyboard_id].push(row.prop_id);
+    }
+
+    // 构建 episode_id → storyboards 映射
+    const sbByEp = {};
+    for (const s of allStoryboards) {
+      const sb = rowToStoryboard(s);
+      sb.prop_ids = spMap[sb.id] || [];
+      if (!sbByEp[s.episode_id]) sbByEp[s.episode_id] = [];
+      sbByEp[s.episode_id].push(sb);
+    }
+
+    // 构建 drama_id → episodes 映射
+    const epByDrama = {};
+    for (const e of allEpisodes) {
       const ep = rowToEpisode(e);
-      const storyboards = db.prepare(
-        'SELECT * FROM storyboards WHERE episode_id = ? AND deleted_at IS NULL ORDER BY storyboard_number ASC'
-      ).all(ep.id);
-      ep.storyboards = storyboards.map((s) => rowToStoryboard(s));
-      try {
-        const sbIds = ep.storyboards.map((s) => s.id);
-        if (sbIds.length > 0) {
-          const placeholders = sbIds.map(() => '?').join(',');
-          const spRows = db.prepare(`SELECT storyboard_id, prop_id FROM storyboard_props WHERE storyboard_id IN (${placeholders})`).all(...sbIds);
-          const spMap = {};
-          for (const row of spRows) {
-            if (!spMap[row.storyboard_id]) spMap[row.storyboard_id] = [];
-            spMap[row.storyboard_id].push(row.prop_id);
-          }
-          for (const sb of ep.storyboards) sb.prop_ids = spMap[sb.id] || [];
-        }
-      } catch (_) {}
+      ep.storyboards = sbByEp[e.id] || [];
       ep.duration = ep.storyboards.reduce((sum, s) => sum + (s.duration || 0), 0);
       if (ep.duration > 0) ep.duration = Math.ceil(ep.duration / 60);
-      return ep;
-    });
+      if (!epByDrama[e.drama_id]) epByDrama[e.drama_id] = [];
+      epByDrama[e.drama_id].push(ep);
+    }
+
+    // 分配到各 drama
+    for (const d of dramas) {
+      d.episodes = epByDrama[d.id] || [];
+    }
   }
+
   return { dramas, total, page, pageSize };
 }
 
@@ -554,9 +592,18 @@ function saveCharacters(db, log, dramaId, req) {
   }
   const characterIds = [];
   const chars = req.characters || [];
+  // 循环外 prepare 固定 SQL
+  const stmtFindCharById = db.prepare('SELECT id FROM characters WHERE id = ? AND drama_id = ?');
+  const stmtFindCharByName = db.prepare('SELECT id FROM characters WHERE drama_id = ? AND name = ?');
+  const stmtPrevCharFull = db.prepare('SELECT id, local_path, image_url, seedance2_asset FROM characters WHERE id = ? AND deleted_at IS NULL');
+  const stmtPrevCharAny = db.prepare('SELECT id, local_path, image_url, seedance2_asset FROM characters WHERE id = ?');
+  const stmtInsertChar = db.prepare(
+    `INSERT INTO characters (drama_id, name, role, description, personality, appearance, image_url, local_path, negative_prompt, sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
+  );
   for (const char of chars) {
     if (char.id) {
-      const ex = db.prepare('SELECT id FROM characters WHERE id = ? AND drama_id = ?').get(char.id, did);
+      const ex = stmtFindCharById.get(char.id, did);
       if (ex) {
         characterIds.push(ex.id);
         // 只更新文本字段；image_url / local_path 仅在调用方显式传入时才覆盖，防止漏传字段清空已有图片
@@ -565,9 +612,7 @@ function saveCharacters(db, log, dramaId, req) {
         if ('image_url' in char) { imgFields.push('image_url = ?'); imgParams.push(char.image_url ?? null); }
         if ('local_path' in char) { imgFields.push('local_path = ?'); imgParams.push(char.local_path ?? null); }
         if (imgFields.length > 0) {
-          const prevC = db
-            .prepare('SELECT id, local_path, image_url, seedance2_asset FROM characters WHERE id = ? AND deleted_at IS NULL')
-            .get(char.id);
+          const prevC = stmtPrevCharFull.get(char.id);
           if (prevC) {
             seedance2AssetGuards.markStaleOnCharacterMainImageDrift(db, log, prevC, {
               image_url: 'image_url' in char ? char.image_url : prevC.image_url,
@@ -588,7 +633,7 @@ function saveCharacters(db, log, dramaId, req) {
         continue;
       }
     }
-    const byName = db.prepare('SELECT id FROM characters WHERE drama_id = ? AND name = ?').get(did, char.name);
+    const byName = stmtFindCharByName.get(did, char.name);
     if (byName) {
       characterIds.push(byName.id);
       // 如果通过名字找到已存在的角色（包含软删除的），也要更新它的信息并复活
@@ -597,9 +642,7 @@ function saveCharacters(db, log, dramaId, req) {
       if ('image_url' in char) { imgFieldsN.push('image_url = ?'); imgParamsN.push(char.image_url ?? null); }
       if ('local_path' in char) { imgFieldsN.push('local_path = ?'); imgParamsN.push(char.local_path ?? null); }
       if (imgFieldsN.length > 0) {
-        const prevN = db
-          .prepare('SELECT id, local_path, image_url, seedance2_asset FROM characters WHERE id = ?')
-          .get(byName.id);
+        const prevN = stmtPrevCharAny.get(byName.id);
         if (prevN) {
           seedance2AssetGuards.markStaleOnCharacterMainImageDrift(db, log, prevN, {
             image_url: 'image_url' in char ? char.image_url : prevN.image_url,
@@ -620,10 +663,7 @@ function saveCharacters(db, log, dramaId, req) {
       continue;
     }
     const now = new Date().toISOString();
-    const info = db.prepare(
-      `INSERT INTO characters (drama_id, name, role, description, personality, appearance, image_url, local_path, negative_prompt, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
-    ).run(did, char.name, char.role ?? null, char.description ?? null, char.personality ?? null, char.appearance ?? null, char.image_url ?? null, char.local_path ?? null, char.negative_prompt ?? null, now, now);
+    const info = stmtInsertChar.run(did, char.name, char.role ?? null, char.description ?? null, char.personality ?? null, char.appearance ?? null, char.image_url ?? null, char.local_path ?? null, char.negative_prompt ?? null, now, now);
     characterIds.push(info.lastInsertRowid);
   }
   if (req.episode_id && characterIds.length > 0) {

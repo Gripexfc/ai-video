@@ -16,3 +16,15 @@ desktop/backend-app-secure/configs/ai-configs-外发.json
 desktop/backend-app-secure/configs/config.yaml
 .DS_Store
 backend-node/deploy-pack
+
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+
+# 临时文件
+*.tmp
+*.log
+
+# 本地工具目录
+.superpowers/

@@ -5,7 +5,8 @@ import { characterLibraryAPI } from '@/api/characterLibrary'
 import { dramaAPI } from '@/api/drama'
 import { generationAPI } from '@/api/generation'
 import { uploadAPI } from '@/api/upload'
-import { createLibraryMembershipState, hasAssetInLibrary, loadLibraryMembership, markAssetInLibrary } from './libraryMembership'
+import { dataUrlToFile } from '@/utils/dataUrlToFile'
+import { useLibraryManagement } from './useLibraryManagement'
 
 /**
  * 角色管理 Composable
@@ -23,15 +24,6 @@ import { createLibraryMembershipState, hasAssetInLibrary, loadLibraryMembership,
 export function useCharacters(deps) {
   const { store, dramaId, currentEpisodeId, getSelectedStyle, getAssetImageModel, loadDrama, pollTask, pollUntilResourceHasImage, hasAssetImage } = deps
 
-  function dataUrlToFile(dataUrl, filename) {
-    const arr = dataUrl.split(',')
-    const mime = (arr[0].match(/:(.*?);/) || [])[1] || 'image/png'
-    const bstr = atob(arr[1])
-    let n = bstr.length
-    const u8arr = new Uint8Array(n)
-    while (n--) u8arr[n] = bstr.charCodeAt(n)
-    return new File([u8arr], filename || 'reference.png', { type: mime })
-  }
 
   // ── 角色弹窗状态 ─────────────────────────────────────
   const showEditCharacter = ref(false)
@@ -48,25 +40,73 @@ export function useCharacters(deps) {
   const charactersGenerating = ref(false)
   const generatingCharIds = reactive(new Set())
 
-  // ── 角色库状态 ────────────────────────────────────────
-  const showCharLibrary = ref(false)
-  const charLibraryList = ref([])
-  const charLibraryLoading = ref(false)
-  const charLibraryPage = ref(1)
-  const charLibraryPageSize = ref(20)
-  const charLibraryTotal = ref(0)
-  const charLibraryKeyword = ref('')
-  const showEditCharLibrary = ref(false)
-  const editCharLibraryForm = ref(null)
-  const editCharLibrarySaving = ref(false)
-  const addingCharToLibraryId = ref(null)
-  const addingCharToMaterialId = ref(null)
-  const addingCharFromLibraryId = ref(null)
+  // ── 角色库（通过 useLibraryManagement 工厂） ────────────
   const sd2CertifyingId = ref(null)
   const showCharSd2Cert = ref(false)
   const charSd2CertPayload = ref(null)
-  const charMembership = createLibraryMembershipState()
-  let charLibraryKeywordTimer = null
+
+  const lib = useLibraryManagement({
+    assetType: '角色',
+    dramaId,
+    loadDrama,
+    hasAssetImage,
+    api: characterLibraryAPI,
+    assetApi: characterAPI,
+    store,
+    getAssets: () => store.characters || [],
+    getAssetName: (item) => (item.name || '未命名').slice(0, 20),
+    addAssetFromLibrary: async (item) => {
+      if (!store.dramaId) return
+      const existingChar = (store.characters || []).find(c => c.name === item.name)
+      if (existingChar) {
+        await characterAPI.update(existingChar.id, {
+          name: item.name || existingChar.name,
+          role: item.role || existingChar.role || undefined,
+          description: item.description || existingChar.description || undefined,
+          appearance: item.appearance || existingChar.appearance || undefined,
+          prompt: item.prompt || existingChar.prompt || undefined,
+          image_url: item.image_url || existingChar.image_url || undefined,
+          local_path: item.local_path || existingChar.local_path || undefined,
+        })
+        ElMessage.success(`「${item.name || '角色'}」已更新`)
+      } else {
+        await characterAPI.create({
+          drama_id: store.dramaId,
+          name: item.name || '',
+          role: item.role || undefined,
+          description: item.description || undefined,
+          appearance: item.appearance || undefined,
+          prompt: item.prompt || undefined,
+          image_url: item.image_url || undefined,
+          local_path: item.local_path || undefined,
+        })
+        ElMessage.success(`「${item.name || '角色'}」已加入`)
+      }
+      await loadDrama()
+    },
+  })
+  const showCharLibrary = lib.showLibrary
+  const charLibraryList = lib.libraryList
+  const charLibraryLoading = lib.libraryLoading
+  const charLibraryPage = lib.libraryPage
+  const charLibraryPageSize = lib.libraryPageSize
+  const charLibraryTotal = lib.libraryTotal
+  const charLibraryKeyword = lib.libraryKeyword
+  const showEditCharLibrary = lib.showEditLibrary
+  const editCharLibraryForm = lib.editLibraryForm
+  const editCharLibrarySaving = lib.editLibrarySaving
+  const addingCharToLibraryId = lib.addingToLibraryId
+  const addingCharToMaterialId = lib.addingToMaterialId
+  const addingCharFromLibraryId = lib.addingFromLibraryId
+  const loadCharLibraryList = lib.loadLibraryList
+  const debouncedLoadCharLibrary = lib.debouncedLoadLibrary
+  const onAddCharToLibrary = lib.onAddToLibrary
+  const onAddCharToMaterialLibrary = lib.onAddToMaterialLibrary
+  const loadCharLibraryMembership = lib.loadMembership
+  const isCharInLibrary = lib.isInLibrary
+  const isCharInMaterialLibrary = lib.isInMaterialLibrary
+  const onAddCharFromLibrary = lib.onAddFromLibrary
+  const onDeleteCharLibrary = lib.onDeleteLibrary
 
   // ── 常量 ──────────────────────────────────────────────
   const CHAR_ROLE_LABEL = { main: '主角', supporting: '配角', minor: '次要角色' }
@@ -332,112 +372,22 @@ export function useCharacters(deps) {
     }
   }
 
-  // ── 角色库函数 ────────────────────────────────────────
-  async function loadCharLibraryList() {
-    charLibraryLoading.value = true
-    try {
-      const res = await characterLibraryAPI.list({
-        drama_id: dramaId.value,
-        page: charLibraryPage.value,
-        page_size: charLibraryPageSize.value,
-        keyword: charLibraryKeyword.value || undefined
-      })
-      charLibraryList.value = res?.items ?? []
-      const pagination = res?.pagination ?? {}
-      charLibraryTotal.value = pagination.total ?? 0
-      if (pagination.page != null) charLibraryPage.value = pagination.page
-      if (pagination.page_size != null) charLibraryPageSize.value = pagination.page_size
-    } catch (e) {
-      charLibraryList.value = []
-    } finally {
-      charLibraryLoading.value = false
-    }
-  }
-
-  function debouncedLoadCharLibrary() {
-    if (charLibraryKeywordTimer) clearTimeout(charLibraryKeywordTimer)
-    charLibraryKeywordTimer = setTimeout(() => {
-      charLibraryPage.value = 1
-      loadCharLibraryList()
-    }, 300)
-  }
+  // ── 角色库函数（由 useLibraryManagement 工厂提供，仅保留适配器）──
 
   function openEditCharLibrary(item) {
-    editCharLibraryForm.value = {
-      id: item.id,
+    lib.openEditLibrary(item, {
       name: item.name ?? '',
       category: item.category ?? '',
       description: item.description ?? '',
-      tags: item.tags ?? ''
-    }
-    showEditCharLibrary.value = true
+      tags: item.tags ?? '',
+    })
   }
 
   async function submitEditCharLibrary() {
-    if (!editCharLibraryForm.value?.id) return
-    editCharLibrarySaving.value = true
-    try {
-      await characterLibraryAPI.update(editCharLibraryForm.value.id, {
-        name: editCharLibraryForm.value.name,
-        category: editCharLibraryForm.value.category || null,
-        description: editCharLibraryForm.value.description || null,
-        tags: editCharLibraryForm.value.tags || null
-      })
-      ElMessage.success('已保存')
-      showEditCharLibrary.value = false
-      loadCharLibraryList()
-    } catch (e) {
-      ElMessage.error(e.message || '保存失败')
-    } finally {
-      editCharLibrarySaving.value = false
-    }
+    await lib.submitEditLibrary(['name', 'category', 'description', 'tags'])
   }
 
-  async function onDeleteCharLibrary(item) {
-    try {
-      await ElMessageBox.confirm(
-        `确定删除公共角色「${(item.name || '未命名').slice(0, 20)}」吗？`,
-        '删除确认',
-        { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
-      )
-      await characterLibraryAPI.delete(item.id)
-      ElMessage.success('已删除')
-      loadCharLibraryList()
-    } catch (e) {
-      if (e === 'cancel') return
-      ElMessage.error(e.message || '删除失败')
-    }
-  }
-
-  async function onAddCharacterToLibrary(char) {
-    if (!hasAssetImage(char)) { ElMessage.warning('请先为该角色生成或上传图片'); return }
-    addingCharToLibraryId.value = char.id
-    try {
-      await characterAPI.addToLibrary(char.id, {})
-      markAssetInLibrary(charMembership.dramaSourceIds, char)
-      ElMessage.success('已加入本剧角色库')
-      if (showCharLibrary.value) loadCharLibraryList()
-    } catch (e) {
-      ElMessage.error(e.message || '加入失败')
-    } finally {
-      addingCharToLibraryId.value = null
-    }
-  }
-
-  async function onAddCharacterToMaterialLibrary(char) {
-    if (!hasAssetImage(char)) { ElMessage.warning('请先为该角色生成或上传图片'); return }
-    addingCharToMaterialId.value = char.id
-    try {
-      await characterAPI.addToMaterialLibrary(char.id)
-      markAssetInLibrary(charMembership.materialSourceIds, char)
-      ElMessage.success('已加入全局素材库')
-    } catch (e) {
-      ElMessage.error(e.message || '加入失败')
-    } finally {
-      addingCharToMaterialId.value = null
-    }
-  }
-
+  // 角色特有：SD2 认证相关函数
   function charSd2TagType(char) {
     const s = char?.seedance2_asset?.status
     if (s === 'active') return 'success'
@@ -493,67 +443,8 @@ export function useCharacters(deps) {
     showCharSd2Cert.value = true
   }
 
-  async function loadCharLibraryMembership() {
-    await loadLibraryMembership({
-      api: characterLibraryAPI,
-      sourceType: 'character',
-      assets: store.characters || [],
-      dramaId: dramaId.value,
-      dramaSourceIds: charMembership.dramaSourceIds,
-      materialSourceIds: charMembership.materialSourceIds,
-    })
-  }
-
-  function isCharInLibrary(char) {
-    return hasAssetInLibrary(charMembership.dramaSourceIds, char)
-  }
-
-  function isCharInMaterialLibrary(char) {
-    return hasAssetInLibrary(charMembership.materialSourceIds, char)
-  }
-
-  async function onAddCharFromLibrary(item) {
-    if (!store.dramaId) return
-    addingCharFromLibraryId.value = item.id
-    try {
-      const existing = (store.characters || []).map((c) => ({
-        id: c.id,
-        name: c.name || '',
-        role: c.role || undefined,
-        appearance: c.appearance || undefined,
-        personality: c.personality || undefined,
-        description: c.description || undefined,
-        image_url: c.image_url || undefined,
-        local_path: c.local_path || undefined,
-      }))
-      const newCharacters = [...existing]
-      const existingChar = newCharacters.find(c => c.name === (item.name || '未命名'))
-      if (existingChar) {
-        existingChar.description = item.description || existingChar.description
-        existingChar.appearance = item.appearance || existingChar.appearance
-        existingChar.image_url = item.image_url || existingChar.image_url
-        existingChar.local_path = item.local_path || existingChar.local_path
-      } else {
-        newCharacters.push({
-          name: item.name || '未命名',
-          description: item.description || undefined,
-          appearance: item.appearance || undefined,
-          image_url: item.image_url || undefined,
-          local_path: item.local_path || undefined,
-        })
-      }
-      await dramaAPI.saveCharacters(store.dramaId, {
-        characters: newCharacters,
-        episode_id: currentEpisodeId.value ?? undefined,
-      })
-      await loadDrama()
-      ElMessage.success(`「${item.name || '角色'}」已加入本集`)
-    } catch (e) {
-      ElMessage.error(e.message || '加入失败')
-    } finally {
-      addingCharFromLibraryId.value = null
-    }
-  }
+  // loadCharLibraryMembership, isCharInLibrary, isCharInMaterialLibrary, onAddCharFromLibrary
+  // 已由 useLibraryManagement 工厂提供（通过 addAssetFromLibrary 传入完整逻辑）
 
   async function extractIdentityAnchors() {
     const form = editCharacterForm.value
@@ -590,6 +481,13 @@ export function useCharacters(deps) {
       ElMessage.error(e.message || '提炼失败')
       extractingAnchors.value = false
     }
+  }
+
+  /**
+   * 清理所有计时器和轮询，组件卸载时调用
+   */
+  function cleanup() {
+    if (editCharacterPollTimer) { clearInterval(editCharacterPollTimer); editCharacterPollTimer = null }
   }
 
   return {
@@ -653,5 +551,6 @@ export function useCharacters(deps) {
     onSd2CertifyRefresh,
     openCharSd2CertDialog,
     onAddCharFromLibrary,
+    cleanup,
   }
 }

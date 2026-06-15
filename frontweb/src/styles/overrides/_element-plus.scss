@@ -1,0 +1,277 @@
+// ── Element Plus Overrides ─────────────────────────
+// Dark + Light 两套主题，用 SCSS 嵌套消除重复的 html.dark/html.light 前缀
+
+// ── Dark Mode ──────────────────────────────────────
+html.dark {
+  --el-bg-color:              var(--bg-card-solid);
+  --el-bg-color-page:         var(--bg-page);
+  --el-bg-color-overlay:      #1c1c1e;
+  --el-text-color-primary:    var(--text-primary);
+  --el-text-color-regular:    var(--text-primary);
+  --el-text-color-secondary:  var(--text-muted);
+  --el-text-color-placeholder: var(--text-faint);
+  --el-border-color:          var(--border-color);
+  --el-border-color-light:    var(--border-muted);
+  --el-border-color-lighter:  var(--border-muted);
+  --el-fill-color:            var(--bg-inner);
+  --el-fill-color-blank:      var(--bg-card-solid);
+  --el-fill-color-light:      var(--bg-hover);
+  --el-fill-color-lighter:    var(--bg-hover);
+  --el-mask-color:            rgba(0, 0, 0, 0.50);
+
+  --el-color-primary:          #d4a24e;
+  --el-color-primary-light-3:  #dcb468;
+  --el-color-primary-light-5:  #e4c482;
+  --el-color-primary-light-7:  #ecd49c;
+  --el-color-primary-light-8:  #f0dcaa;
+  --el-color-primary-light-9:  #f6e8c4;
+  --el-color-primary-dark-2:   #b08838;
+
+  // Card
+  .el-card {
+    background: var(--bg-card-solid) !important;
+    border-color: var(--border-muted) !important;
+    color: var(--text-primary) !important;
+    border-radius: var(--radius-lg) !important;
+  }
+
+  // Dialog
+  .el-dialog {
+    background: var(--bg-card-solid) !important;
+    border: 1px solid var(--border-muted) !important;
+    border-radius: var(--radius-2xl) !important;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+
+    &__header { border-bottom-color: var(--border-color) !important; }
+    &__title  { color: var(--text-bright) !important; }
+    &__body   { color: var(--text-primary) !important; }
+  }
+
+  // Input / Textarea
+  .el-input__wrapper,
+  .el-textarea__wrapper {
+    background: rgba(28, 28, 30, 0.5) !important;
+    box-shadow: 0 0 0 1px var(--border-color) !important;
+    border-radius: var(--radius-md) !important;
+  }
+  .el-input__inner,
+  .el-textarea__inner {
+    color: var(--text-primary) !important;
+  }
+
+  // Select
+  .el-select-dropdown {
+    background: var(--bg-card-solid) !important;
+    border: 1px solid var(--border-muted) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.40) !important;
+
+    &__item {
+      color: var(--text-primary) !important;
+      &:hover { background: var(--bg-hover) !important; }
+    }
+  }
+
+  // Collapse
+  .el-collapse-item__header,
+  .el-collapse-item__wrap {
+    background: transparent !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+
+  // Table
+  .el-table {
+    &,
+    tr {
+      background: transparent !important;
+      color: var(--text-primary) !important;
+    }
+    td, th { border-color: var(--border-color) !important; }
+  }
+
+  // Overlay
+  .el-overlay {
+    background-color: rgba(0, 0, 0, 0.50) !important;
+    backdrop-filter: blur(8px);
+  }
+
+  // Button — default
+  .el-button--default:not(.is-link) {
+    --el-button-bg-color: rgba(255, 255, 255, 0.04);
+    --el-button-border-color: var(--border-muted);
+    --el-button-text-color: var(--text-muted);
+    --el-button-hover-bg-color: var(--bg-hover);
+    --el-button-hover-border-color: var(--border-color);
+    --el-button-hover-text-color: var(--text-primary);
+  }
+
+  // Button — danger
+  .el-button--danger.is-plain {
+    --el-button-bg-color: rgba(239, 68, 68, 0.06);
+    --el-button-border-color: rgba(239, 68, 68, 0.20);
+    --el-button-text-color: #f87171;
+    --el-button-hover-bg-color: rgba(239, 68, 68, 0.12);
+    --el-button-hover-border-color: rgba(239, 68, 68, 0.35);
+    --el-button-hover-text-color: #fca5a5;
+  }
+
+  // Dialog padding
+  .el-dialog__header {
+    border-bottom: 1px solid var(--border-color) !important;
+    padding: 18px 22px !important;
+  }
+  .el-dialog__body   { padding: 22px !important; }
+  .el-dialog__footer {
+    padding: 14px 22px 18px !important;
+    border-top: 1px solid var(--border-color) !important;
+  }
+
+  // Loading
+  .el-loading-mask {
+    background-color: rgba(0, 0, 0, 0.45) !important;
+    backdrop-filter: blur(6px);
+  }
+
+  // Notification
+  .el-notification {
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18) !important;
+  }
+
+  // Radio
+  .el-radio-button__original-radio:checked + .el-radio-button__inner {
+    color: #1a1a1f !important;
+  }
+}
+
+// ── Light Mode ─────────────────────────────────────
+html.light {
+  --el-bg-color:              var(--bg-card-solid);
+  --el-bg-color-page:         var(--bg-page);
+  --el-bg-color-overlay:      var(--bg-card-solid);
+  --el-text-color-primary:    var(--text-primary);
+  --el-text-color-regular:    var(--text-primary);
+  --el-text-color-secondary:  var(--text-muted);
+  --el-text-color-placeholder: var(--text-faint);
+  --el-border-color:          var(--border-color);
+  --el-border-color-light:    var(--border-muted);
+  --el-fill-color:            var(--bg-inner);
+  --el-fill-color-blank:      var(--bg-card-solid);
+  --el-fill-color-light:      var(--bg-hover);
+  --el-fill-color-lighter:    var(--bg-hover);
+  --el-mask-color:            rgba(0, 0, 0, 0.18);
+
+  --el-color-primary:          #b08828;
+  --el-color-primary-light-3:  #c4a048;
+  --el-color-primary-light-5:  #d4b468;
+  --el-color-primary-light-7:  #e0c688;
+  --el-color-primary-light-8:  #e8d0a0;
+  --el-color-primary-light-9:  #f0dcb8;
+  --el-color-primary-dark-2:   #8c6c1c;
+
+  .el-card,
+  .el-dialog {
+    background: var(--bg-card-solid) !important;
+    border-color: var(--border-muted) !important;
+    color: var(--text-primary) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06) !important;
+  }
+
+  .el-dialog {
+    &__header { border-bottom-color: var(--border-color) !important; }
+    &__title  { color: var(--text-bright) !important; }
+  }
+
+  .el-input__wrapper,
+  .el-textarea__wrapper {
+    background: var(--bg-inner) !important;
+    box-shadow: 0 0 0 1px var(--border-color) !important;
+    border-radius: var(--radius-md) !important;
+
+    &:hover     { box-shadow: 0 0 0 1px var(--border-muted) !important; }
+    &.is-focus  { box-shadow: 0 0 0 2px var(--accent) !important; }
+  }
+
+  .el-input__inner,
+  .el-textarea__inner {
+    background: transparent !important;
+    color: var(--text-primary) !important;
+  }
+
+  .el-select-dropdown {
+    background: var(--bg-card-solid) !important;
+    border-color: var(--border-muted) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
+
+    &__item {
+      color: var(--text-primary) !important;
+      &:hover { background: var(--bg-hover) !important; }
+    }
+  }
+
+  .el-collapse-item__header,
+  .el-collapse-item__wrap {
+    background: var(--bg-card-solid) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .el-table {
+    border-radius: var(--radius-lg) !important;
+    overflow: hidden !important;
+
+    &,
+    &__header-wrapper,
+    tr {
+      background: var(--bg-card-solid) !important;
+      color: var(--text-primary) !important;
+    }
+    td, th { border-color: var(--border-color) !important; }
+
+    th.el-table__cell {
+      background: var(--bg-inner) !important;
+      color: var(--text-muted) !important;
+      font-weight: 500 !important;
+    }
+  }
+
+  .el-pagination { color: var(--text-muted) !important; }
+  .el-pager li   { background: var(--bg-inner) !important; color: var(--text-muted) !important; }
+
+  .el-radio-button__inner {
+    background: var(--bg-inner) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-muted) !important;
+  }
+  .el-radio-button__original-radio:checked + .el-radio-button__inner {
+    background: var(--accent) !important;
+    color: #fff !important;
+  }
+
+  .el-message-box {
+    background: var(--bg-card-solid) !important;
+    border-color: var(--border-color) !important;
+    &__title   { color: var(--text-bright) !important; }
+    &__content { color: var(--text-primary) !important; }
+  }
+
+  .el-loading-mask { background-color: rgba(245, 245, 247, 0.75) !important; }
+
+  .el-tag--info {
+    background: var(--bg-hover) !important;
+    color: var(--text-muted) !important;
+  }
+
+  .el-button--primary:not(.is-link):not(.is-plain) { color: #fff !important; }
+  .el-pager li.is-active                           { color: #fff !important; }
+
+  .el-notification { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important; }
+
+  // Striped table
+  .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+    background: var(--bg-inner) !important;
+  }
+
+  span, label, p { color: inherit; }
+}

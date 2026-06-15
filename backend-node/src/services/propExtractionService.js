@@ -73,18 +73,21 @@ async function processPropExtraction(db, log, taskId, episodeId) {
 
   const dramaId = episode.drama_id;
   const createdProps = [];
+  // 循环外 prepare，避免重复编译 SQL
+  const stmtFindProp = db.prepare(
+    'SELECT id FROM props WHERE drama_id = ? AND name = ? AND deleted_at IS NULL'
+  );
+  const stmtUpdateProp = db.prepare(
+    'UPDATE props SET type = ?, description = ?, prompt = ?, updated_at = ? WHERE id = ?'
+  );
   for (const p of extractedProps) {
     const name = (p.name && String(p.name).trim()) || '';
     if (!name) continue;
-    const existing = db.prepare(
-      'SELECT id FROM props WHERE drama_id = ? AND name = ? AND deleted_at IS NULL'
-    ).get(dramaId, name);
+    const existing = stmtFindProp.get(dramaId, name);
     if (existing) {
       // 重新提取时更新描述和提示词（保留已有图片）
       const now = new Date().toISOString();
-      db.prepare(
-        'UPDATE props SET type = ?, description = ?, prompt = ?, updated_at = ? WHERE id = ?'
-      ).run(
+      stmtUpdateProp.run(
         (p.type && String(p.type).trim()) || null,
         (p.description && String(p.description).trim()) || null,
         (p.image_prompt && String(p.image_prompt).trim()) || null,

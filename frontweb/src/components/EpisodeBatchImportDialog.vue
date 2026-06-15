@@ -269,17 +269,17 @@ async function confirmImport() {
 .batch-import-tabs { width: 100%; }
 .batch-import-panel { display: flex; flex-direction: column; gap: 16px; min-height: 420px; }
 .batch-import-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.batch-import-file { font-size: 0.85rem; color: #a1a1aa; }
-.batch-import-file.is-empty { color: #71717a; }
+.batch-import-file { font-size: 0.85rem; color: var(--text-muted); }
+.batch-import-file.is-empty { color: var(--text-subtle); }
 .batch-import-form { margin-bottom: 0; }
 .batch-import-tip-block { display: flex; flex-direction: column; gap: 8px; }
-.batch-import-tip { font-size: 0.82rem; color: #71717a; }
-.batch-import-code { color: #c084fc; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace; }
-.batch-import-empty { min-height: 320px; display: flex; align-items: center; justify-content: center; color: #71717a; border: 1px dashed #3f3f46; border-radius: 12px; }
-.batch-import-preview-header { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 12px; color: #c084fc; font-size: 0.85rem; flex-wrap: wrap; }
-.batch-import-preview-table :deep(.el-table) { --el-table-bg-color: transparent; --el-table-tr-bg-color: transparent; --el-table-border-color: #3f3f46; --el-table-header-bg-color: rgba(39, 39, 42, 0.9); --el-table-row-hover-bg-color: rgba(139, 92, 246, 0.08); color: #e4e4e7; }
+.batch-import-tip { font-size: 0.82rem; color: var(--text-subtle); }
+.batch-import-code { color: #d4915a; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace; }
+.batch-import-empty { min-height: 320px; display: flex; align-items: center; justify-content: center; color: var(--text-subtle); border: 1px dashed var(--border-muted); border-radius: 12px; }
+.batch-import-preview-header { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 12px; color: #d4915a; font-size: 0.85rem; flex-wrap: wrap; }
+.batch-import-preview-table :deep(.el-table) { --el-table-bg-color: transparent; --el-table-tr-bg-color: transparent; --el-table-border-color: var(--border-muted); --el-table-header-bg-color: rgba(39, 39, 42, 0.9); --el-table-row-hover-bg-color: rgba(224, 145, 90, 0.08); color: var(--text-primary); }
 .batch-import-preview-table :deep(.el-table__inner-wrapper::before) { display: none; }
-.batch-import-preview-table :deep(th.el-table__cell) { color: #fafafa; }
+.batch-import-preview-table :deep(th.el-table__cell) { color: var(--text-bright); }
 .batch-import-preview-table :deep(td.el-table__cell) { vertical-align: top; }
 .batch-import-preview-cell { line-height: 1.6; white-space: pre-wrap; color: #d4d4d8; }
 .batch-import-preview-cell--single-line { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }

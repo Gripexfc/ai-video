@@ -52,7 +52,7 @@ async function processCharacterGeneration(db, cfg, log, taskID, req) {
       }
     }
     effectiveCfg = mergeCfgStyleWithDrama(next, dramaRow);
-  } catch (_) {}
+  } catch (_) { /* JSON.parse — 静默回退 */ }
 
   if (!outlineText) {
     outlineText = promptI18n.formatUserPrompt(
@@ -85,7 +85,7 @@ async function processCharacterGeneration(db, cfg, log, taskID, req) {
     return;
   }
 
-  console.log('[角色生成] AI 原始返回：\n' + text);
+  log.debug('[角色生成] AI 原始返回', { text_length: text?.length, preview: String(text).slice(0, 200) });
 
   let result;
   try {
@@ -93,7 +93,7 @@ async function processCharacterGeneration(db, cfg, log, taskID, req) {
     result = extractFirstArray(parsed) || [];
   } catch (err) {
     log.error('Character generation parse failed', { error: err.message, task_id: taskID });
-    console.error('[角色生成] JSON解析失败，原始内容：\n' + text);
+    log.error('[角色生成] JSON解析失败', { text_preview: String(text).slice(0, 300) });
     taskService.updateTaskStatus(db, taskID, 'failed', 0, '解析AI返回结果失败');
     return;
   }
@@ -181,7 +181,7 @@ async function processCharacterGeneration(db, cfg, log, taskID, req) {
     for (const c of characters) {
       try {
         db.prepare('INSERT OR IGNORE INTO episode_characters (episode_id, character_id) VALUES (?, ?)').run(episodeId, c.id);
-      } catch (_) {}
+      } catch (e) { log.warn('DB update failed', { error: e.message }) }
     }
   }
 

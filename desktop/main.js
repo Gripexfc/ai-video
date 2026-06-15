@@ -25,9 +25,9 @@ process.on('unhandledRejection', (reason) => {
 
 writeMainLog(`main.js loaded packaged=${app.isPackaged} exec=${process.execPath}`);
 
-// 兼容迁移：若旧路径 LocalMiniDrama 有数据而新路径为空，自动迁移
+// 兼容迁移：若旧路径 视频miao~ 有数据而新路径为空，自动迁移
 ;(function migrateOldUserData() {
-  const oldPath = path.join(app.getPath('appData'), 'LocalMiniDrama');
+  const oldPath = path.join(app.getPath('appData'), '视频miao~');
   if (fs.existsSync(oldPath) && !fs.existsSync(USERDATA_DIR)) {
     try {
       fs.renameSync(oldPath, USERDATA_DIR);
@@ -178,8 +178,10 @@ function findFreePort(preferredPort) {
 function createWindow(port) {
   Menu.setApplicationMenu(null);
   const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: 1440,
+    height: 900,
+    minWidth: 1024,
+    minHeight: 680,
     webPreferences: { nodeIntegration: false, contextIsolation: true },
     show: false,
   });
@@ -261,7 +263,7 @@ app.whenReady().then(async () => {
     app.quit();
     return;
   }
-  // startBackend 的 Promise 在 listen 回调中 resolve，服务器此时已就绪，直接建窗口
+  // 直接打开主窗口，未激活时 SPA 路由守卫自动跳转到激活页
   createWindow(port);
 });
 

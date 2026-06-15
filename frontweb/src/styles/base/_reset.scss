@@ -1,0 +1,58 @@
+// ── Base Reset & Typography ────────────────────────
+@use '../abstracts/variables' as *;
+
+body, .app {
+  font-family: $font-body !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, .section-title, .logo-main, .page-title, .project-title {
+  font-family: $font-display !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.022em;
+}
+
+// Scrollbar — macOS native feel
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+
+  &-track { background: transparent; }
+  &-thumb {
+    background: rgba(255, 255, 255, 0.10);
+    border-radius: 3px;
+
+    &:hover { background: rgba(255, 255, 255, 0.18); }
+  }
+}
+
+// Light mode scrollbar
+html.light {
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.10);
+    &:hover { background: rgba(0, 0, 0, 0.18); }
+  }
+}
+
+// Base resets
+html {
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+  scrollbar-gutter: stable;
+
+  &, body, #app, .app {
+    background: var(--bg-page) !important;
+    color: var(--text-primary) !important;
+    transition: background-color var(--duration-slow) ease, color var(--duration-slow) ease;
+  }
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  &:hover { text-decoration: underline; }
+}
+
+img { -webkit-user-drag: none; }

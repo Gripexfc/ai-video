@@ -1,728 +1,406 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
-            <script>
-var _hmt = _hmt || [];
-(function() {
-  var hm = document.createElement("script");
-  hm.src = "https://hm.baidu.com/hm.js?8988d3d1107443988d053a62481e73cf";
-  var s = document.getElementsByTagName("script")[0]; 
-  s.parentNode.insertBefore(hm, s);
-})();
-</script>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本地短剧助手 - AI 驱动的短剧创作工具</title>
-    <meta name="description" content="LocalMiniDrama是一款基于AI的短剧创作工具，支持角色、场景、道具智能生成，分镜编辑，一键视频合成。免费开源，立即下载！">
-    <meta name="keywords" content="AI视频生成,短剧创作,分镜工具,AI视频合成,开源视频工具">
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind CSS -->
+    <title>视频miao~ 视频miao~ — AI 驱动的短剧创作工具</title>
+    <meta name="description" content="视频miao~ 是一款基于 AI 的短剧创作工具，支持角色、场景、道具智能生成，分镜编辑，一键视频合成。免费开源，立即下载！">
+    <meta name="keywords" content="AI视频生成,短剧创作,分镜工具,AI视频合成,开源视频工具,视频miao~">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
                         primary: {
-                            50: '#FDF2F8',
-                            100: '#FCE7F3',
-                            200: '#FBCFE8',
-                            300: '#F9A8D4',
-                            400: '#F472B6',
-                            500: '#EC4899',
-                            600: '#DB2777',
-                            700: '#BE185D',
-                            800: '#9D174D',
-                            900: '#831843',
+                            50: '#FDF8F0', 100: '#F9EDD8', 200: '#F2D8B0',
+                            300: '#E8BD82', 400: '#D4915A', 500: '#C47A3A',
+                            600: '#A86830', 700: '#8A5225', 800: '#6B3E1C', 900: '#4A2A12',
                         },
-                        accent: {
-                            400: '#FB923C',
-                            500: '#F97316',
-                            600: '#EA580C',
-                        }
+                        accent: { 400: '#7CB8D8', 500: '#5EA8D4', 600: '#3D8AB5' },
                     },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                    },
-                    boxShadow: {
-                        'soft': '0 4px 20px -2px rgba(236, 72, 153, 0.15)',
-                        'soft-lg': '0 10px 40px -4px rgba(236, 72, 153, 0.2)',
-                    }
+                    fontFamily: { sans: ['system-ui', '-apple-system', 'sans-serif'] },
                 }
             }
         }
     </script>
-    
     <style>
-        body {
-            font-family: 'Inter', system-ui, sans-serif;
+        html { scroll-behavior: smooth; }
+        .gradient-text {
+            background: linear-gradient(135deg, #fff 0%, #F2D8B0 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
-        
-        .gradient-bg {
-            background: linear-gradient(135deg, #FDF2F8 0%, #FCE7F3 50%, #FBCFE8 100%);
-        }
-        
-        .hero-gradient {
-            background: linear-gradient(180deg, #831843 0%, #9D174D 50%, #EC4899 100%);
-        }
-        
-        .card-hover {
-            transition: all 0.3s ease;
-        }
-        
-        .card-hover:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px -4px rgba(236, 72, 153, 0.2);
-        }
-        
         .btn-primary {
-            background: linear-gradient(135deg, #F97316 0%, #EA580C 100%);
+            background: linear-gradient(135deg, #C47A3A 0%, #A86830 100%);
             transition: all 0.3s ease;
         }
-        
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px -4px rgba(249, 115, 22, 0.4);
+            box-shadow: 0 10px 30px -4px rgba(196, 122, 58, 0.4);
         }
-        
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+        .btn-ghost {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.25);
             transition: all 0.3s ease;
         }
-        
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.25);
+        .btn-ghost:hover { background: rgba(255,255,255,0.2); }
+        .card-lift { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+        .card-lift:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 40px -4px rgba(196,122,58,0.15);
         }
-        
-        .feature-icon {
-            background: linear-gradient(135deg, #EC4899 0%, #F472B6 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+        .screenshots-scroll {
+            overflow-x: auto; scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
         }
-        
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .animate-fade-in-up {
-            animation: fadeInUp 0.6s ease-out forwards;
-        }
-        
-        .delay-100 { animation-delay: 0.1s; }
-        .delay-200 { animation-delay: 0.2s; }
-        .delay-300 { animation-delay: 0.3s; }
-        .delay-400 { animation-delay: 0.4s; }
-        
-        .gradient-text {
-            background: linear-gradient(135deg, #fff 0%, #FCE7F3 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .github-card {
-            background: rgba(255, 255, 255, 0.95);
-            border: 1px solid rgba(236, 72, 153, 0.2);
-        }
-        
+        .screenshots-scroll::-webkit-scrollbar { display: none; }
+        .screenshots-scroll > div { scroll-snap-align: center; }
+        /* Lightbox */
+        .lightbox { display: none; position: fixed; inset: 0; z-index: 100;
+            background: rgba(0,0,0,0.9); align-items: center; justify-content: center;
+            cursor: zoom-out; }
+        .lightbox.active { display: flex; }
+        .lightbox img { max-width: 92vw; max-height: 88vh; border-radius: 8px; object-fit: contain; }
+        /* Fade in */
+        @keyframes fadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+        .fade-up { opacity: 0; }
+        .fade-up.visible { animation: fadeUp 0.6s ease-out forwards; }
         @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-            }
+            .fade-up.visible { animation: none; opacity: 1; }
+            .card-lift:hover { transform: none; }
         }
     </style>
 </head>
-<body class="bg-primary-50 text-primary-900 antialiased">
-    <!-- Navigation -->
-    <nav class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-primary-100">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <!-- Logo -->
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-                        <i data-lucide="film" class="w-6 h-6 text-white"></i>
+
+<body class="antialiased text-primary-900">
+
+<!-- ===== Nav ===== -->
+<nav class="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-lg border-b border-primary-100">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
+        <a href="#" class="flex items-center gap-2.5">
+            <div class="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center">
+                <i data-lucide="film" class="w-4 h-4 text-white"></i>
+            </div>
+            <span class="font-bold text-primary-900 leading-tight">视频miao~</span>
+        </a>
+        <div class="hidden md:flex items-center gap-7 text-sm font-medium">
+            <a href="#features" class="text-primary-600 hover:text-primary-500 transition-colors">功能</a>
+            <a href="#screenshots" class="text-primary-600 hover:text-primary-500 transition-colors">截图</a>
+            <a href="#workflow" class="text-primary-600 hover:text-primary-500 transition-colors">流程</a>
+            <a href="#download" class="text-primary-600 hover:text-primary-500 transition-colors">下载</a>
+            <a href="https://github.com/your-repo/视频miao~" target="_blank" class="text-primary-600 hover:text-primary-500 transition-colors inline-flex items-center gap-1">
+                <i data-lucide="github" class="w-4 h-4"></i> GitHub
+            </a>
+        </div>
+        <button id="menu-btn" class="md:hidden p-2 -mr-2 text-primary-700">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+    </div>
+    <div id="mobile-menu" class="hidden md:hidden border-t border-primary-100 bg-white">
+        <div class="px-4 py-3 space-y-2 text-sm font-medium">
+            <a href="#features" class="block py-1.5 text-primary-700">功能</a>
+            <a href="#screenshots" class="block py-1.5 text-primary-700">截图</a>
+            <a href="#workflow" class="block py-1.5 text-primary-700">流程</a>
+            <a href="#download" class="block py-1.5 text-primary-700">下载</a>
+            <a href="https://github.com/your-repo/视频miao~" target="_blank" class="block py-1.5 text-primary-700">GitHub</a>
+        </div>
+    </div>
+</nav>
+
+<!-- ===== Hero ===== -->
+<section class="relative overflow-hidden" style="background:linear-gradient(180deg,#1a1210 0%,#2a1e16 60%,#3a2820 100%);">
+    <div class="absolute inset-0 opacity-[0.07]" style="background-image:radial-gradient(circle at 1px 1px,#fff 1px,transparent 0);background-size:36px 36px;"></div>
+    <div class="absolute top-16 left-8 w-64 h-64 bg-primary-400/20 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-8 right-8 w-80 h-80 bg-accent-500/15 rounded-full blur-3xl"></div>
+
+    <div class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16 lg:pt-36 lg:pb-24 text-center">
+        <div class="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-3.5 py-1.5 rounded-full mb-6 text-primary-100 text-xs font-medium">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> AI 驱动的短剧创作工具
+        </div>
+
+        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold gradient-text mb-3">视频miao~</h1>
+        <p class="text-lg text-primary-200 mb-2">视频miao~</p>
+        <p class="text-base text-primary-300 max-w-xl mx-auto mb-8 leading-relaxed">
+            轻松创建专业短剧：AI 智能生成角色、场景、道具，一站式分镜编辑，一键视频合成。完全免费，本地运行，数据不上云。
+        </p>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-5">
+            <a href="#download" class="btn-primary px-7 py-3 rounded-xl text-white font-semibold inline-flex items-center gap-2">
+                <i data-lucide="download" class="w-5 h-5"></i> 立即下载
+            </a>
+            <a href="https://github.com/your-repo/视频miao~" target="_blank" class="btn-ghost px-7 py-3 rounded-xl text-white font-semibold inline-flex items-center gap-2">
+                <i data-lucide="github" class="w-5 h-5"></i> 查看源码
+            </a>
+        </div>
+
+        <p class="text-primary-400 text-xs">当前版本 v1.2.6 · 开源免费 · 持续更新</p>
+
+        <!-- Video -->
+        <div class="mt-12 max-w-4xl mx-auto">
+            <div class="rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10 bg-black/20">
+                <iframe src="https://player.bilibili.com/player.html?bvid=BV1fsRXBEEHy&page=1"
+                    width="100%" height="460" scrolling="no" frameborder="0"
+                    allowfullscreen loading="lazy"
+                    class="block w-full" style="aspect-ratio:16/9;height:auto;"
+                    title="视频miao~ 视频教程"></iframe>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Features ===== -->
+<section id="features" class="py-20 lg:py-28 bg-primary-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-14 fade-up">
+            <h2 class="text-3xl lg:text-4xl font-bold text-primary-900 mb-3">强大功能，一应俱全</h2>
+            <p class="text-primary-600 max-w-lg mx-auto">从故事创作到视频导出，全流程 AI 辅助，让短剧制作变得简单高效</p>
+        </div>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 fade-up">
+            <!-- 1 -->
+            <div class="bg-white rounded-2xl p-7 shadow-sm border border-primary-100 card-lift">
+                <div class="w-11 h-11 bg-primary-100 rounded-xl flex items-center justify-center mb-5">
+                    <i data-lucide="users" class="w-5 h-5 text-primary-600"></i>
+                </div>
+                <h3 class="text-lg font-bold text-primary-900 mb-2">智能角色生成</h3>
+                <p class="text-primary-600 text-sm leading-relaxed">输入角色描述，AI 自动生成角色设定与外观图片。支持多角色管理，满足复杂剧情需求。</p>
+            </div>
+            <!-- 2 -->
+            <div class="bg-white rounded-2xl p-7 shadow-sm border border-primary-100 card-lift">
+                <div class="w-11 h-11 bg-primary-100 rounded-xl flex items-center justify-center mb-5">
+                    <i data-lucide="image" class="w-5 h-5 text-primary-600"></i>
+                </div>
+                <h3 class="text-lg font-bold text-primary-900 mb-2">场景与道具库</h3>
+                <p class="text-primary-600 text-sm leading-relaxed">丰富的内置素材库，支持 AI 生成定制化场景和道具。全局素材库跨项目共享。</p>
+            </div>
+            <!-- 3 -->
+            <div class="bg-white rounded-2xl p-7 shadow-sm border border-primary-100 card-lift">
+                <div class="w-11 h-11 bg-primary-100 rounded-xl flex items-center justify-center mb-5">
+                    <i data-lucide="layout-grid" class="w-5 h-5 text-primary-600"></i>
+                </div>
+                <h3 class="text-lg font-bold text-primary-900 mb-2">分镜编辑</h3>
+                <p class="text-primary-600 text-sm leading-relaxed">可视化分镜编辑，支持镜头类型、机位角度、运动方式等专业参数，每帧精准可控。</p>
+            </div>
+            <!-- 4 -->
+            <div class="bg-white rounded-2xl p-7 shadow-sm border border-primary-100 card-lift">
+                <div class="w-11 h-11 bg-primary-100 rounded-xl flex items-center justify-center mb-5">
+                    <i data-lucide="video" class="w-5 h-5 text-primary-600"></i>
+                </div>
+                <h3 class="text-lg font-bold text-primary-900 mb-2">一键视频合成</h3>
+                <p class="text-primary-600 text-sm leading-relaxed">根据分镜脚本自动匹配素材，生成高质量短片。支持多种分辨率与导出格式。</p>
+            </div>
+            <!-- 5 -->
+            <div class="bg-white rounded-2xl p-7 shadow-sm border border-primary-100 card-lift">
+                <div class="w-11 h-11 bg-primary-100 rounded-xl flex items-center justify-center mb-5">
+                    <i data-lucide="settings" class="w-5 h-5 text-primary-600"></i>
+                </div>
+                <h3 class="text-lg font-bold text-primary-900 mb-2">灵活 AI 配置</h3>
+                <p class="text-primary-600 text-sm leading-relaxed">支持通义、豆包、可灵、Gemini 等多家 AI 模型，自带中转站配置，灵活接入。</p>
+            </div>
+            <!-- 6 -->
+            <div class="bg-white rounded-2xl p-7 shadow-sm border border-primary-100 card-lift">
+                <div class="w-11 h-11 bg-primary-100 rounded-xl flex items-center justify-center mb-5">
+                    <i data-lucide="folder-archive" class="w-5 h-5 text-primary-600"></i>
+                </div>
+                <h3 class="text-lg font-bold text-primary-900 mb-2">项目导入导出</h3>
+                <p class="text-primary-600 text-sm leading-relaxed">支持项目完整打包导出/导入，方便备份和分享。内置示例项目，快速上手。</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Screenshots ===== -->
+<section id="screenshots" class="py-20 lg:py-28 bg-white">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-14 fade-up">
+            <h2 class="text-3xl lg:text-4xl font-bold text-primary-900 mb-3">产品截图</h2>
+            <p class="text-primary-600">真实界面，所见即所得</p>
+        </div>
+
+        <!-- Mobile: horizontal scroll | Desktop: grid -->
+        <div class="screenshots-scroll flex gap-5 lg:grid lg:grid-cols-3 lg:overflow-visible pb-4 lg:pb-0 fade-up">
+            <div class="min-w-[280px] sm:min-w-[320px] lg:min-w-0 flex-shrink-0 group cursor-pointer" onclick="openLightbox(this)">
+                <div class="rounded-xl overflow-hidden border border-primary-100 shadow-sm card-lift">
+                    <img src="项目截图/首页截图.png" alt="首页截图" class="w-full block" loading="lazy">
+                </div>
+                <p class="text-center text-sm text-primary-500 mt-2">项目管理首页</p>
+            </div>
+            <div class="min-w-[280px] sm:min-w-[320px] lg:min-w-0 flex-shrink-0 group cursor-pointer" onclick="openLightbox(this)">
+                <div class="rounded-xl overflow-hidden border border-primary-100 shadow-sm card-lift">
+                    <img src="项目截图/武侠.png" alt="剧集管理" class="w-full block" loading="lazy">
+                </div>
+                <p class="text-center text-sm text-primary-500 mt-2">剧集管理</p>
+            </div>
+            <div class="min-w-[280px] sm:min-w-[320px] lg:min-w-0 flex-shrink-0 group cursor-pointer" onclick="openLightbox(this)">
+                <div class="rounded-xl overflow-hidden border border-primary-100 shadow-sm card-lift">
+                    <img src="项目截图/武侠分镜.png" alt="分镜编辑" class="w-full block" loading="lazy">
+                </div>
+                <p class="text-center text-sm text-primary-500 mt-2">分镜编辑</p>
+            </div>
+            <div class="min-w-[280px] sm:min-w-[320px] lg:min-w-0 flex-shrink-0 group cursor-pointer" onclick="openLightbox(this)">
+                <div class="rounded-xl overflow-hidden border border-primary-100 shadow-sm card-lift">
+                    <img src="项目截图/新版本4宫格分镜.png" alt="4宫格分镜" class="w-full block" loading="lazy">
+                </div>
+                <p class="text-center text-sm text-primary-500 mt-2">4宫格分镜</p>
+            </div>
+            <div class="min-w-[280px] sm:min-w-[320px] lg:min-w-0 flex-shrink-0 group cursor-pointer" onclick="openLightbox(this)">
+                <div class="rounded-xl overflow-hidden border border-primary-100 shadow-sm card-lift">
+                    <img src="项目截图/专业分镜.png" alt="专业分镜参数" class="w-full block" loading="lazy">
+                </div>
+                <p class="text-center text-sm text-primary-500 mt-2">专业分镜参数</p>
+            </div>
+            <div class="min-w-[280px] sm:min-w-[320px] lg:min-w-0 flex-shrink-0 group cursor-pointer" onclick="openLightbox(this)">
+                <div class="rounded-xl overflow-hidden border border-primary-100 shadow-sm card-lift">
+                    <img src="项目截图/本剧场景库.png" alt="场景库" class="w-full block" loading="lazy">
+                </div>
+                <p class="text-center text-sm text-primary-500 mt-2">场景库</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Lightbox -->
+<div id="lightbox" class="lightbox" onclick="closeLightbox()">
+    <img id="lightbox-img" src="" alt="放大预览">
+</div>
+
+<!-- ===== Workflow ===== -->
+<section id="workflow" class="py-20 lg:py-28 bg-primary-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-14 fade-up">
+            <h2 class="text-3xl lg:text-4xl font-bold text-primary-900 mb-3">四步完成你的第一部 AI 短剧</h2>
+        </div>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 fade-up">
+            <div class="text-center">
+                <div class="w-14 h-14 bg-primary-500 text-white rounded-2xl flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-md">1</div>
+                <h3 class="font-bold text-primary-900 mb-1.5">创建项目</h3>
+                <p class="text-primary-600 text-sm">填写剧名与简介，AI 自动生成多集剧本</p>
+            </div>
+            <div class="text-center">
+                <div class="w-14 h-14 bg-primary-500 text-white rounded-2xl flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-md">2</div>
+                <h3 class="font-bold text-primary-900 mb-1.5">生成素材</h3>
+                <p class="text-primary-600 text-sm">AI 生成角色、场景、道具图片，或从素材库导入</p>
+            </div>
+            <div class="text-center">
+                <div class="w-14 h-14 bg-primary-500 text-white rounded-2xl flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-md">3</div>
+                <h3 class="font-bold text-primary-900 mb-1.5">编辑分镜</h3>
+                <p class="text-primary-600 text-sm">设置镜头参数，预览每帧效果，精调细节</p>
+            </div>
+            <div class="text-center">
+                <div class="w-14 h-14 bg-primary-500 text-white rounded-2xl flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-md">4</div>
+                <h3 class="font-bold text-primary-900 mb-1.5">合成导出</h3>
+                <p class="text-primary-600 text-sm">一键生成视频，选择分辨率与格式后导出分享</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Download ===== -->
+<section id="download" class="py-20 lg:py-28" style="background:linear-gradient(135deg,#C47A3A 0%,#8A5225 100%);">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h2 class="text-3xl lg:text-4xl font-bold text-white mb-3 fade-up">立即下载体验</h2>
+        <p class="text-primary-100 mb-10 fade-up">完全免费，开源可用 · 支持 Windows 和 macOS</p>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8 fade-up">
+            <a href="https://github.com/your-repo/视频miao~/releases/download/v1.2.6/视频miao~.1.2.6.exe"
+               class="bg-white text-primary-700 px-7 py-3.5 rounded-xl font-semibold inline-flex items-center gap-2 shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
+               download>
+                <i data-lucide="monitor" class="w-5 h-5"></i> Windows 版
+            </a>
+            <a href="https://github.com/your-repo/视频miao~/releases/download/v1.2.6/视频miao~-1.2.6-mac-arm64.dmg"
+               class="bg-white text-primary-700 px-7 py-3.5 rounded-xl font-semibold inline-flex items-center gap-2 shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
+               download>
+                <i data-lucide="apple" class="w-5 h-5"></i> macOS (Apple Silicon)
+            </a>
+            <a href="https://github.com/your-repo/视频miao~/releases/download/v1.2.6/视频miao~-1.2.6-mac-x64.dmg"
+               class="bg-white text-primary-700 px-7 py-3.5 rounded-xl font-semibold inline-flex items-center gap-2 shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
+               download>
+                <i data-lucide="apple" class="w-5 h-5"></i> macOS (Intel)
+            </a>
+        </div>
+
+        <div class="text-primary-200 text-xs space-y-1 fade-up">
+            <p>国内旧版本：<a href="https://gitee.com/your-repo/localminidrama/releases" target="_blank" class="text-white underline hover:no-underline">Gitee 下载</a></p>
+            <p>备用网盘：<a href="https://pan.baidu.com/s/1qeyrmlom1f_LTCODpcpVHA?pwd=688z" target="_blank" class="text-white underline hover:no-underline">百度网盘</a></p>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Footer ===== -->
+<footer class="bg-primary-900 text-primary-300 py-12">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid sm:grid-cols-3 gap-8 mb-8">
+            <div>
+                <div class="flex items-center gap-2.5 mb-3">
+                    <div class="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center">
+                        <i data-lucide="film" class="w-4 h-4 text-white"></i>
                     </div>
                     <div>
-                        <span class="font-bold text-lg text-primary-900">本地短剧助手</span>
-                        <span class="text-xs text-primary-600 block">LocalMiniDrama</span>
+                        <span class="font-bold text-white text-sm">视频miao~</span>
+                        <span class="text-[10px] text-primary-500 block leading-tight">视频miao~</span>
                     </div>
                 </div>
-                
-                <!-- Nav Links -->
-                <div class="hidden md:flex items-center space-x-8">
-                    <a href="#features" class="text-primary-700 hover:text-primary-500 transition-colors font-medium">功能特点</a>
-                    <a href="#getting-started" class="text-primary-700 hover:text-primary-500 transition-colors font-medium">快速开始</a>
-                    <a href="#ai-relay" class="text-primary-700 hover:text-primary-500 transition-colors font-medium">AI 与中转</a>
-                    <a href="#download" class="text-primary-700 hover:text-primary-500 transition-colors font-medium">下载</a>
-                    <a href="https://github.com/xuanyustudio/LocalMiniDrama" target="_blank" class="text-primary-700 hover:text-primary-500 transition-colors font-medium flex items-center gap-2">
-                        <i data-lucide="git-branch" class="w-5 h-5"></i>
-                        GitHub
-                    </a>
-                </div>
-                
-                <!-- Mobile Menu Button -->
-                <button id="mobile-menu-btn" class="md:hidden p-2 text-primary-700">
-                    <i data-lucide="menu" class="w-6 h-6"></i>
-                </button>
+                <p class="text-xs text-primary-400 leading-relaxed">AI 驱动的短剧创作工具，让每个人都能轻松创作专业短剧。</p>
+            </div>
+            <div>
+                <h4 class="font-semibold text-white text-sm mb-3">相关链接</h4>
+                <ul class="space-y-1.5 text-xs">
+                    <li><a href="https://github.com/your-repo/视频miao~" target="_blank" class="hover:text-white transition-colors">GitHub 仓库</a></li>
+                    <li><a href="https://github.com/your-repo/视频miao~/releases" target="_blank" class="hover:text-white transition-colors">版本发布</a></li>
+                    <li><a href="https://github.com/your-repo/视频miao~/issues" target="_blank" class="hover:text-white transition-colors">问题反馈</a></li>
+                    <li><a href="https://github.com/your-repo/视频miao~/discussions" target="_blank" class="hover:text-white transition-colors">社区讨论</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="font-semibold text-white text-sm mb-3">联系我们</h4>
+                <ul class="space-y-1.5 text-xs">
+                    <li><a href="../../issues" target="_blank" class="hover:text-white transition-colors">问题反馈</a></li>
+                    <li><a href="../../discussions" target="_blank" class="hover:text-white transition-colors">社区讨论</a></li>
+                </ul>
             </div>
         </div>
-        
-        <!-- Mobile Menu -->
-        <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-primary-100">
-            <div class="px-4 py-4 space-y-3">
-                <a href="#features" class="block text-primary-700 font-medium">功能特点</a>
-                <a href="#getting-started" class="block text-primary-700 font-medium">快速开始</a>
-                <a href="#ai-relay" class="block text-primary-700 font-medium">AI 与中转</a>
-                <a href="#download" class="block text-primary-700 font-medium">下载</a>
-                <a href="https://github.com/xuanyustudio/LocalMiniDrama" target="_blank" class="block text-primary-700 font-medium flex items-center gap-2">
-                    <i data-lucide="git-branch" class="w-5 h-5"></i>
-                    GitHub
-                </a>
-            </div>
+        <div class="border-t border-primary-800 pt-6 text-center text-xs text-primary-500">
+            &copy; <span id="year"></span> 视频miao~. 基于 MIT 许可证开源。
         </div>
-    </nav>
+    </div>
+</footer>
 
-    <!-- Hero Section -->
-    <section class="hero-gradient pt-32 pb-24 lg:pt-40 lg:pb-32 relative overflow-hidden">
-        <!-- Background Pattern -->
-        <div class="absolute inset-0 opacity-10">
-            <div class="absolute inset-0" style="background-image: radial-gradient(circle at 1px 1px, white 1px, transparent 0); background-size: 40px 40px;"></div>
-        </div>
-        
-        <!-- Floating Elements -->
-        <div class="absolute top-20 left-10 w-72 h-72 bg-primary-400/20 rounded-full blur-3xl"></div>
-        <div class="absolute bottom-10 right-10 w-96 h-96 bg-accent-500/20 rounded-full blur-3xl"></div>
-        
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-            <div class="text-center max-w-4xl mx-auto">
-                <!-- Badge -->
-                <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full mb-8 animate-fade-in-up">
-                    <i data-lucide="sparkles" class="w-4 h-4 text-primary-200"></i>
-                    <span class="text-primary-100 text-sm font-medium">✨ AI 驱动的短剧创作工具</span>
-                </div>
-                
-                <!-- Title -->
-                <h1 class="text-5xl lg:text-7xl font-bold gradient-text mb-6 animate-fade-in-up delay-100">
-                    本地短剧助手
-                </h1>
-                
-                <p class="text-xl lg:text-2xl text-primary-100 mb-4 animate-fade-in-up delay-200">
-                    LocalMiniDrama
-                </p>
-                
-                <p class="text-lg text-primary-200 mb-10 max-w-2xl mx-auto animate-fade-in-up delay-300">
-                    轻松创建专业短剧：AI 智能生成角色、场景、道具，一站式分镜编辑，一键视频合成。让创作变得简单高效！
-                </p>
-                
-                <!-- CTA Buttons -->
-                <div class="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up delay-400">
-                    <a href="#download" class="btn-primary px-8 py-4 rounded-xl text-white font-semibold text-lg flex items-center gap-3">
-                        <i data-lucide="download" class="w-6 h-6"></i>
-                        立即下载
-                    </a>
-                    <a href="https://github.com/xuanyustudio/LocalMiniDrama" target="_blank" class="btn-secondary px-8 py-4 rounded-xl text-white font-semibold text-lg flex items-center gap-3">
-                        <i data-lucide="git-branch" class="w-6 h-6"></i>
-                        查看源码
-                    </a>
-                </div>
-                
-                <!-- Version Info -->
-                <p class="text-primary-300 text-sm mt-6 animate-fade-in-up delay-400">
-                    当前版本: v1.2.6 · 开源免费 · 持续更新
-                    <span class="mx-2 opacity-50">·</span>
-                    <a href="#ai-relay" class="text-primary-100 hover:text-white underline underline-offset-2">各大平台中转示例配置</a>
-                    <span class="mx-2 opacity-50">·</span>
-                    <a href="https://ffir.cn" target="_blank" rel="noopener noreferrer" class="text-primary-50 hover:text-white underline underline-offset-2 text-base font-semibold">我一直在用的推荐中转站</a>
-                </p>
-            </div>
-            
-            <!-- Hero Image / Demo -->
-            <div class="mt-16 animate-fade-in-up delay-400">
-                <div class="relative max-w-5xl mx-auto">
-                    <div class="github-card rounded-2xl shadow-soft-lg overflow-hidden">
-                        <!-- Mockup Header -->
-                        <div class="bg-gray-100 px-4 py-3 flex items-center gap-2 border-b border-gray-200">
-                            <div class="w-3 h-3 rounded-full bg-red-400"></div>
-                            <div class="w-3 h-3 rounded-full bg-yellow-400"></div>
-                            <div class="w-3 h-3 rounded-full bg-green-400"></div>
-                            <div class="ml-4 bg-white rounded-lg px-3 py-1 text-xs text-gray-500 flex items-center gap-2">
-                                <i data-lucide="film" class="w-3 h-3"></i>
-                                LocalMiniDrama - AI 视频生成
-                            </div>
-                        </div>
-                        <!-- Mockup Content -->
-                        <div class="bg-gradient-to-br from-primary-50 to-primary-100 p-8">
-                            <!-- 功能介绍 -->
-                            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                <div class="text-center">
-                                    <div class="w-12 h-12 bg-primary-500 rounded-xl mx-auto mb-3 flex items-center justify-center">
-                                        <i data-lucide="users" class="w-6 h-6 text-white"></i>
-                                    </div>
-                                    <p class="text-sm font-medium text-primary-700">角色生成</p>
-                                </div>
-                                <div class="text-center">
-                                    <div class="w-12 h-12 bg-primary-500 rounded-xl mx-auto mb-3 flex items-center justify-center">
-                                        <i data-lucide="images" class="w-6 h-6 text-white"></i>
-                                    </div>
-                                    <p class="text-sm font-medium text-primary-700">场景创建</p>
-                                </div>
-                                <div class="text-center">
-                                    <div class="w-12 h-12 bg-primary-500 rounded-xl mx-auto mb-3 flex items-center justify-center">
-                                        <i data-lucide="box" class="w-6 h-6 text-white"></i>
-                                    </div>
-                                    <p class="text-sm font-medium text-primary-700">道具管理</p>
-                                </div>
-                                <div class="text-center">
-                                    <div class="w-12 h-12 bg-primary-500 rounded-xl mx-auto mb-3 flex items-center justify-center">
-                                        <i data-lucide="layout-grid" class="w-6 h-6 text-white"></i>
-                                    </div>
-                                    <p class="text-sm font-medium text-primary-700">分镜编辑</p>
-                                </div>
-                                <div class="text-center">
-                                    <div class="w-12 h-12 bg-primary-500 rounded-xl mx-auto mb-3 flex items-center justify-center">
-                                        <i data-lucide="video" class="w-6 h-6 text-white"></i>
-                                    </div>
-                                    <p class="text-sm font-medium text-primary-700">视频合成</p>
-                                </div>
-                            </div>
-                            <!-- 视频教程（B 站嵌入） -->
-                            <div class="mt-8 max-w-4xl mx-auto">
-                                <p class="text-center text-sm font-semibold text-primary-800 mb-3">视频教程</p>
-                                <div class="rounded-xl overflow-hidden shadow-md ring-1 ring-primary-200/60 bg-white">
-                                    <iframe
-                                        src="https://player.bilibili.com/player.html?bvid=BV1fsRXBEEHy&page=1"
-                                        class="w-full block border-0"
-                                        width="100%"
-                                        height="500"
-                                        scrolling="no"
-                                        frameborder="0"
-                                        allowfullscreen="true"
-                                        title="LocalMiniDrama 视频教程"
-                                        loading="lazy"
-                                        referrerpolicy="no-referrer-when-downgrade"></iframe>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
+<script>
+    lucide.createIcons();
+    document.getElementById('year').textContent = new Date().getFullYear();
 
-    <!-- Stats Section -->
-    <section class="bg-white py-12 border-b border-primary-100">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
-                <div class="text-center">
-                    <div class="text-4xl font-bold text-primary-600">⭐⭐⭐⭐⭐</div>
-                    <p class="text-primary-600 mt-2">用户评价</p>
-                </div>
-                <div class="text-center">
-                    <div class="text-4xl font-bold text-primary-600">100%</div>
-                    <p class="text-primary-600 mt-2">免费开源</p>
-                </div>
-                <div class="text-center">
-                    <div class="text-4xl font-bold text-primary-600">持续</div>
-                    <p class="text-primary-600 mt-2">更新迭代</p>
-                </div>
-                <div class="text-center">
-                    <div class="text-4xl font-bold text-primary-600">本地</div>
-                    <p class="text-primary-600 mt-2">隐私安全</p>
-                </div>
-            </div>
-        </div>
-    </section>
+    // Mobile menu
+    const menuBtn = document.getElementById('menu-btn');
+    const mobileMenu = document.getElementById('mobile-menu');
+    menuBtn.addEventListener('click', () => mobileMenu.classList.toggle('hidden'));
+    mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => mobileMenu.classList.add('hidden')));
 
-    <!-- Features Section -->
-    <section id="features" class="py-24 bg-primary-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <!-- Section Header -->
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-bold text-primary-900 mb-4">强大功能，一应俱全</h2>
-                <p class="text-xl text-primary-600 max-w-2xl mx-auto">
-                    从故事创作到视频导出，全流程 AI 辅助，让短剧制作变得简单高效
-                </p>
-            </div>
-            
-            <!-- Features Grid -->
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <!-- Feature 1 -->
-                <div class="bg-white rounded-2xl p-8 shadow-soft card-hover">
-                    <div class="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mb-6">
-                        <i data-lucide="users" class="w-7 h-7 text-primary-600"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-primary-900 mb-3">智能角色生成</h3>
-                    <p class="text-primary-600">
-                        输入角色描述，AI 自动生成角色设定、外观、性格。支持多角色管理，满足复杂剧情需求。
-                    </p>
-                </div>
-                
-                <!-- Feature 2 -->
-                <div class="bg-white rounded-2xl p-8 shadow-soft card-hover">
-                    <div class="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mb-6">
-                        <i data-lucide="images" class="w-7 h-7 text-primary-600"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-primary-900 mb-3">场景与道具库</h3>
-                    <p class="text-primary-600">
-                        丰富的内置素材库，支持 AI 生成定制化场景和道具。一键添加，快速构建你的故事世界。
-                    </p>
-                </div>
-                
-                <!-- Feature 3 -->
-                <div class="bg-white rounded-2xl p-8 shadow-soft card-hover">
-                    <div class="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mb-6">
-                        <i data-lucide="layout-grid" class="w-7 h-7 text-primary-600"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-primary-900 mb-3">分镜编辑</h3>
-                    <p class="text-primary-600">
-                        可视化分镜编辑界面，支持镜头类型、机位角度、运动方式等专业参数设置，让每帧都精准可控。
-                    </p>
-                </div>
-                
-                <!-- Feature 4 -->
-                <div class="bg-white rounded-2xl p-8 shadow-soft card-hover">
-                    <div class="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mb-6">
-                        <i data-lucide="video" class="w-7 h-7 text-primary-600"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-primary-900 mb-3">一键视频合成</h3>
-                    <p class="text-primary-600">
-                        根据分镜脚本自动匹配素材，生成高质量短片。支持多种分辨率与导出格式。
-                    </p>
-                </div>
-                
-                <!-- Feature 5 -->
-                <div class="bg-white rounded-2xl p-8 shadow-soft card-hover">
-                    <div class="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mb-6">
-                        <i data-lucide="settings" class="w-7 h-7 text-primary-600"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-primary-900 mb-3">灵活 AI 配置</h3>
-                    <p class="text-primary-600">
-                        支持多种 AI 模型接入，灵活配置 API Key。仓库内提供「各大平台中转站配置」示例 JSON，可一键对照导入后再替换为自己的 Key。
-                    </p>
-                </div>
-                
-                <!-- Feature 6 -->
-                <div class="bg-white rounded-2xl p-8 shadow-soft card-hover">
-                    <div class="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mb-6">
-                        <i data-lucide="folder-archive" class="w-7 h-7 text-primary-600"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-primary-900 mb-3">项目导入导出</h3>
-                    <p class="text-primary-600">
-                        支持项目完整导出/导入，方便备份和分享。内置多种示例项目，快速上手体验。
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
+    // Scroll fade-in
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+    }, { threshold: 0.15 });
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
 
-    <!-- Getting Started Section -->
-    <section id="getting-started" class="py-24 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <!-- Section Header -->
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-bold text-primary-900 mb-4">快速开始</h2>
-                <p class="text-xl text-primary-600 max-w-2xl mx-auto">
-                    四步完成你的第一部 AI 短剧
-                </p>
-            </div>
-            
-            <!-- Steps -->
-            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <!-- Step 1 -->
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-primary-500 text-white rounded-2xl flex items-center justify-center text-2xl font-bold mx-auto mb-6 shadow-soft">
-                        1
-                    </div>
-                    <h3 class="text-lg font-bold text-primary-900 mb-2">创建项目</h3>
-                    <p class="text-primary-600 text-sm">
-                        下载安装后，打开软件，点击「新建项目」，填写剧名与简介
-                    </p>
-                </div>
-                
-                <!-- Step 2 -->
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-primary-500 text-white rounded-2xl flex items-center justify-center text-2xl font-bold mx-auto mb-6 shadow-soft">
-                        2
-                    </div>
-                    <h3 class="text-lg font-bold text-primary-900 mb-2">生成素材</h3>
-                    <p class="text-primary-600 text-sm">
-                        使用 AI 生成角色、场景、道具；或从本地库导入已有素材
-                    </p>
-                </div>
-                
-                <!-- Step 3 -->
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-primary-500 text-white rounded-2xl flex items-center justify-center text-2xl font-bold mx-auto mb-6 shadow-soft">
-                        3
-                    </div>
-                    <h3 class="text-lg font-bold text-primary-900 mb-2">编辑分镜</h3>
-                    <p class="text-primary-600 text-sm">
-                        拖拽时间线，设置导演参数，预览每一帧效果，精调细节
-                    </p>
-                </div>
-                
-                <!-- Step 4 -->
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-primary-500 text-white rounded-2xl flex items-center justify-center text-2xl font-bold mx-auto mb-6 shadow-soft">
-                        4
-                    </div>
-                    <h3 class="text-lg font-bold text-primary-900 mb-2">合成导出</h3>
-                    <p class="text-primary-600 text-sm">
-                        一键生成视频，选择分辨率与格式后导出，分享你的作品
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- AI relay / platform presets -->
-    <section id="ai-relay" class="py-24 bg-gradient-to-b from-primary-50 to-white border-t border-primary-100">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-14">
-                <h2 class="text-4xl font-bold text-primary-900 mb-4">AI 与各大平台中转站</h2>
-                <p class="text-xl text-primary-600 max-w-3xl mx-auto">
-                    在 GitHub 仓库的 <code class="text-sm bg-primary-100 px-2 py-0.5 rounded text-primary-800">各大平台中转站配置/</code> 目录中，整理了常见中转服务商的示例配置，便于快速找到对应站点并对照修改。
-                </p>
-            </div>
-
-            <div class="max-w-3xl mx-auto mb-12 bg-white rounded-2xl p-8 shadow-soft border border-primary-100">
-                <h3 class="text-lg font-bold text-primary-900 mb-3 flex items-center gap-2">
-                    <i data-lucide="book-open" class="w-5 h-5 text-primary-600"></i>
-                    怎么用
-                </h3>
-                <ol class="list-decimal list-inside space-y-2 text-primary-700 text-sm sm:text-base">
-                    <li>打开仓库目录：<a href="https://github.com/xuanyustudio/LocalMiniDrama/tree/main/%E5%90%84%E5%A4%A7%E5%B9%B3%E5%8F%B0%E4%B8%AD%E8%BD%AC%E7%AB%99%E9%85%8D%E7%BD%AE" target="_blank" rel="noopener noreferrer" class="text-primary-600 font-medium underline hover:text-primary-500">各大平台中转站配置（GitHub）</a>，先阅读其中的 <code class="text-xs bg-primary-50 px-1.5 py-0.5 rounded">使用说明.txt</code>。</li>
-                    <li>选择与你购买服务一致的中转商 JSON（文件名即站点标识），在应用 AI 设置中导入或手动对照字段填写。</li>
-                    <li>将配置里<strong class="text-primary-900">每一条服务</strong>的 <code class="text-xs bg-primary-50 px-1.5 py-0.5 rounded">api_key</code> 全部替换为你自己的 Key；<code class="text-xs bg-primary-50 px-1.5 py-0.5 rounded">base_url</code> 若中转商提供了专属域名，请按对方文档修改。</li>
-                    <li>若某中转站模型列表与示例不一致，以服务商后台为准，在应用内选择或填写对方开放的模型 ID 即可。</li>
-                </ol>
-            </div>
-
-            <div class="mb-14">
-                <h3 class="text-lg font-bold text-primary-900 mb-4 text-center">示例配置文件（直链）</h3>
-                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
-                    <a href="https://raw.githubusercontent.com/xuanyustudio/LocalMiniDrama/main/%E5%90%84%E5%A4%A7%E5%B9%B3%E5%8F%B0%E4%B8%AD%E8%BD%AC%E7%AB%99%E9%85%8D%E7%BD%AE/302ai-302.json" target="_blank" rel="noopener noreferrer" class="github-card rounded-xl p-5 card-hover flex flex-col gap-2">
-                        <span class="font-semibold text-primary-900">302.AI（302ai-302.json）</span>
-                        <span class="text-sm text-primary-600">点击在浏览器中打开原始 JSON，另存后导入或复制字段。</span>
-                    </a>
-                    <a href="https://raw.githubusercontent.com/xuanyustudio/LocalMiniDrama/main/%E5%90%84%E5%A4%A7%E5%B9%B3%E5%8F%B0%E4%B8%AD%E8%BD%AC%E7%AB%99%E9%85%8D%E7%BD%AE/%E4%BA%91%E9%9B%BEai.json" target="_blank" rel="noopener noreferrer" class="github-card rounded-xl p-5 card-hover flex flex-col gap-2">
-                        <span class="font-semibold text-primary-900">云雾 AI（云雾ai.json）</span>
-                        <span class="text-sm text-primary-600">同上，按需替换 Key 与地址。</span>
-                    </a>
-                    <a href="https://raw.githubusercontent.com/xuanyustudio/LocalMiniDrama/main/%E5%90%84%E5%A4%A7%E5%B9%B3%E5%8F%B0%E4%B8%AD%E8%BD%AC%E7%AB%99%E9%85%8D%E7%BD%AE/%E5%90%91%E9%87%8F.json" target="_blank" rel="noopener noreferrer" class="github-card rounded-xl p-5 card-hover flex flex-col gap-2">
-                        <span class="font-semibold text-primary-900">向量（向量.json）</span>
-                        <span class="text-sm text-primary-600">同上。</span>
-                    </a>
-                    <a href="https://raw.githubusercontent.com/xuanyustudio/LocalMiniDrama/main/%E5%90%84%E5%A4%A7%E5%B9%B3%E5%8F%B0%E4%B8%AD%E8%BD%AC%E7%AB%99%E9%85%8D%E7%BD%AE/%E9%A3%9E%E5%84%BFapi-ffir.cn.json" target="_blank" rel="noopener noreferrer" class="github-card rounded-xl p-5 card-hover flex flex-col gap-2 sm:col-span-2 lg:col-span-1">
-                        <span class="font-semibold text-primary-900">飞儿 API（飞儿api-ffir.cn.json）</span>
-                        <span class="text-sm text-primary-600">同上。</span>
-                    </a>
-                    <a href="https://raw.githubusercontent.com/xuanyustudio/LocalMiniDrama/main/%E5%90%84%E5%A4%A7%E5%B9%B3%E5%8F%B0%E4%B8%AD%E8%BD%AC%E7%AB%99%E9%85%8D%E7%BD%AE/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E.txt" target="_blank" rel="noopener noreferrer" class="github-card rounded-xl p-5 card-hover flex flex-col gap-2 sm:col-span-2">
-                        <span class="font-semibold text-primary-900">使用说明.txt</span>
-                        <span class="text-sm text-primary-600">导入后务必将各条目的 Key 改为自己的；与示例不一致时以中转商文档为准。</span>
-                    </a>
-                </div>
-            </div>
-
-            <div class="max-w-3xl mx-auto bg-white rounded-2xl p-8 shadow-soft border border-accent-500/20">
-                <h3 class="text-lg font-bold text-primary-900 mb-3 flex items-center gap-2">
-                    <i data-lucide="image-plus" class="w-5 h-5 text-accent-600"></i>
-                    即梦 2.0 / Seedream（火山图生图 · 文生图）说明
-                </h3>
-                <div class="space-y-3 text-primary-700 text-sm sm:text-base leading-relaxed">
-                    <p>示例配置里，<strong class="text-primary-900">分镜图生图</strong>（<code class="text-xs bg-primary-50 px-1.5 py-0.5 rounded">storyboard_image</code>）与<strong class="text-primary-900">文生图</strong>（<code class="text-xs bg-primary-50 px-1.5 py-0.5 rounded">image</code>）中的「火山引擎」线路，使用的是字节 <strong class="text-primary-900">Seedream（即梦）系列</strong>模型 ID，例如 <code class="text-xs bg-primary-50 px-1.5 py-0.5 rounded">doubao-seedream-4-0-250828</code>、<code class="text-xs bg-primary-50 px-1.5 py-0.5 rounded">doubao-seedream-4-5-251128</code> 等。中转商控制台若仍标注为「即梦 2.0」等商品名，请以<strong class="text-primary-900">对方实际开放的模型 ID</strong>为准，在应用内与 JSON 中保持一致即可。</p>
-                    <p>使用这类线路时，请确认该条目的 <code class="text-xs bg-primary-50 px-1.5 py-0.5 rounded">api_protocol</code> 为 <code class="text-xs bg-primary-50 px-1.5 py-0.5 rounded">volcengine</code>，<code class="text-xs bg-primary-50 px-1.5 py-0.5 rounded">base_url</code>、<code class="text-xs bg-primary-50 px-1.5 py-0.5 rounded">endpoint</code> 与中转站文档一致；不要与 OpenAI 兼容协议的条目混用。</p>
-                    <p><strong class="text-primary-900">分辨率提示：</strong>Seedream 4.5 及以上对输出像素有下限要求（约 1920×1920 等效面积）。本应用在请求时会自动把小尺寸等比放大以满足接口要求；若你自行改模型或尺寸仍报错，请优先检查中转站返回说明或改用示例中的默认模型。</p>
-                    <p><strong class="text-primary-900">即梦 2.0 对照图：</strong>同目录下提供示意图，便于与中转商「即梦 2.0」商品名或控制台字段一一对应：<a href="https://github.com/xuanyustudio/LocalMiniDrama/blob/main/%E5%90%84%E5%A4%A7%E5%B9%B3%E5%8F%B0%E4%B8%AD%E8%BD%AC%E7%AB%99%E9%85%8D%E7%BD%AE/%E5%AE%98%E6%96%B9%E5%8D%B3%E6%A2%A62.0%E9%85%8D%E7%BD%AE.png" target="_blank" rel="noopener noreferrer" class="text-primary-600 font-medium underline hover:text-primary-500">官方即梦 2.0 配置示意</a>、<a href="https://github.com/xuanyustudio/LocalMiniDrama/blob/main/%E5%90%84%E5%A4%A7%E5%B9%B3%E5%8F%B0%E4%B8%AD%E8%BD%AC%E7%AB%99%E9%85%8D%E7%BD%AE/%E8%B0%83%E7%94%A8%E6%9C%AC%E5%9C%B0%E5%8F%8D%E5%90%91%E4%BB%A3%E7%90%86%E5%8D%B3%E6%A2%A6freeapi%E7%9A%84%E9%85%8D%E7%BD%AE.png" target="_blank" rel="noopener noreferrer" class="text-primary-600 font-medium underline hover:text-primary-500">本地反向代理即梦 Free API 配置示意</a>（与 JSON 示例互补，按你的实际接入方式选看）。</p>
-                    <p class="text-sm text-primary-600">视频侧若使用自建「即梦」OpenAI 兼容服务，请参考仓库 <code class="text-xs bg-primary-50 px-1.5 py-0.5 rounded">backend-node/README.md</code> 中的 Jimeng AI API 章节。</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Download Section -->
-    <section id="download" class="py-24 bg-gradient-to-br from-primary-600 to-primary-800">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center">
-                <h2 class="text-4xl font-bold text-white mb-6">立即下载体验</h2>
-                <p class="text-xl text-primary-100 mb-10 max-w-2xl mx-auto">
-                    完全免费，开源可用。支持 Windows、macOS、Linux 平台
-                </p>
-                
-                <!-- Download Buttons -->
-                <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-                    <a href="https://github.com/xuanyustudio/LocalMiniDrama/releases/download/v1.2.6/LocalMiniDrama.1.2.6.exe"
-                       class="bg-white text-primary-700 px-8 py-4 rounded-xl font-semibold text-lg flex items-center gap-3 shadow-soft hover:shadow-soft-lg transition-all hover:-translate-y-1"
-                       download>
-                        <i data-lucide="monitor" class="w-6 h-6"></i>
-                        Windows 版
-                    </a>
-                    <a href="https://github.com/xuanyustudio/LocalMiniDrama/releases/download/v1.2.6/LocalMiniDrama-1.2.6-mac-arm64.dmg"
-                       class="bg-white text-primary-700 px-8 py-4 rounded-xl font-semibold text-lg flex items-center gap-3 shadow-soft hover:shadow-soft-lg transition-all hover:-translate-y-1"
-                       download>
-                        <i data-lucide="apple" class="w-6 h-6"></i>
-                        macOS 版 (Apple Silicon)
-                    </a>
-                    <a href="https://github.com/xuanyustudio/LocalMiniDrama/releases/download/v1.2.6/LocalMiniDrama-1.2.6-mac-x64.dmg"
-                       class="bg-white text-primary-700 px-8 py-4 rounded-xl font-semibold text-lg flex items-center gap-3 shadow-soft hover:shadow-soft-lg transition-all hover:-translate-y-1"
-                       download>
-                        <i data-lucide="apple" class="w-6 h-6"></i>
-                        macOS 版 (Intel)
-                    </a>
-                </div>
-                
-                <!-- Alternative Download -->
-                <div class="space-y-2">
-                    <p class="text-primary-200 text-sm">
-                        国内旧版本下载：<a href="https://gitee.com/bi_shang_a/localminidrama/releases/download/v1.2.1/LocalMiniDrama-Lite-1.2.1.exe" target="_blank" class="text-white underline hover:no-underline">Gitee 下载</a>
-                    </p>
-                    <p class="text-primary-200 text-sm">
-                        备用网盘：<a href="https://pan.baidu.com/s/1qeyrmlom1f_LTCODpcpVHA?pwd=688z" target="_blank" class="text-white underline hover:no-underline">百度网盘</a>
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Tech Stack / Support Section -->
-    <section class="py-24 bg-primary-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold text-primary-900 mb-4">技术栈</h2>
-                <p class="text-primary-600">基于现代前端技术构建</p>
-            </div>
-            
-            <div class="flex flex-wrap items-center justify-center gap-8">
-                <div class="flex items-center gap-2 text-primary-600">
-                    <i data-lucide="file-code" class="w-6 h-6"></i>
-                    <span class="font-medium">Vue 3</span>
-                </div>
-                <div class="flex items-center gap-2 text-primary-600">
-                    <i data-lucide="box" class="w-6 h-6"></i>
-                    <span class="font-medium">Element Plus</span>
-                </div>
-                <div class="flex items-center gap-2 text-primary-600">
-                    <i data-lucide="cpu" class="w-6 h-6"></i>
-                    <span class="font-medium">AI Integration</span>
-                </div>
-                <div class="flex items-center gap-2 text-primary-600">
-                    <i data-lucide="database" class="w-6 h-6"></i>
-                    <span class="font-medium">SQLite</span>
-                </div>
-                <div class="flex items-center gap-2 text-primary-600">
-                    <i data-lucide="git-branch" class="w-6 h-6"></i>
-                    <span class="font-medium">Open Source</span>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="bg-primary-900 text-primary-200 py-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid md:grid-cols-3 gap-8 mb-8">
-                <!-- Brand -->
-                <div>
-                    <div class="flex items-center space-x-3 mb-4">
-                        <div class="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-                            <i data-lucide="film" class="w-6 h-6 text-white"></i>
-                        </div>
-                        <div>
-                            <span class="font-bold text-lg text-white">本地短剧助手</span>
-                            <span class="text-xs text-primary-400 block">LocalMiniDrama</span>
-                        </div>
-                    </div>
-                    <p class="text-sm text-primary-300">
-                        AI 驱动的短剧创作工具，让每个人都能轻松创作专业短剧。
-                    </p>
-                </div>
-                
-                <!-- Links -->
-                <div>
-                    <h4 class="font-semibold text-white mb-4">相关链接</h4>
-                    <ul class="space-y-2 text-sm">
-                        <li><a href="https://github.com/xuanyustudio/LocalMiniDrama" class="hover:text-white transition-colors">GitHub 仓库</a></li>
-                        <li><a href="https://github.com/xuanyustudio/LocalMiniDrama/tree/main/%E5%90%84%E5%A4%A7%E5%B9%B3%E5%8F%B0%E4%B8%AD%E8%BD%AC%E7%AB%99%E9%85%8D%E7%BD%AE" class="hover:text-white transition-colors">各大平台中转站配置</a></li>
-                        <li><a href="https://github.com/xuanyustudio/LocalMiniDrama/releases" class="hover:text-white transition-colors">版本发布</a></li>
-                        <li><a href="https://github.com/xuanyustudio/LocalMiniDrama/issues" class="hover:text-white transition-colors">问题反馈</a></li>
-                        <li><a href="https://github.com/xuanyustudio/LocalMiniDrama/discussions" class="hover:text-white transition-colors">社区讨论</a></li>
-                    </ul>
-                </div>
-                
-                <!-- Contact -->
-                <div>
-                    <h4 class="font-semibold text-white mb-4">联系我们</h4>
-                    <ul class="space-y-2 text-sm">
-                        <li class="flex items-center gap-2">
-                            <i data-lucide="message-circle" class="w-4 h-4"></i>
-                            <span>微信：qiangui8</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-            
-            <!-- Copyright -->
-            <div class="border-t border-primary-800 pt-8 text-center text-sm text-primary-400">
-                <p>&copy; <span id="year"></span> LocalMiniDrama. 基于 MIT 许可证开源。</p>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Scripts -->
-    <script>
-        // Initialize Lucide icons
-        lucide.createIcons();
-        
-        // Mobile menu toggle
-        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-        const mobileMenu = document.getElementById('mobile-menu');
-        
-        mobileMenuBtn.addEventListener('click', () => {
-            mobileMenu.classList.toggle('hidden');
-        });
-        
-        // Set current year
-        document.getElementById('year').textContent = new Date().getFullYear();
-        
-        // Smooth scroll for anchor links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
-            });
-        });
-    </script>
-
-
+    // Lightbox
+    function openLightbox(el) {
+        const img = el.querySelector('img');
+        if (!img) return;
+        document.getElementById('lightbox-img').src = img.src;
+        document.getElementById('lightbox').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeLightbox() {
+        document.getElementById('lightbox').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+</script>
 </body>
 </html>

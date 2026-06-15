@@ -1,0 +1,22 @@
+// =====================================================
+// 视频miao~ Design System — Apple HIG
+// SCSS 主入口：按层级组装所有模块
+// =====================================================
+
+// 1. 抽象层：变量、Mixins、动画
+@use 'abstracts/variables' as *;
+@use 'abstracts/mixins' as *;
+@use 'abstracts/animations';
+
+// 2. 基础层：Design Tokens + Reset
+@use 'base/tokens';
+@use 'base/reset';
+
+// 3. 覆盖层：Element Plus 主题适配
+@use 'overrides/element-plus';
+
+// 4. 组件层：通用组件美化
+@use 'components/element-polish';
+
+// 5. 工具层：Utilities
+@use 'utilities/index';

@@ -137,7 +137,7 @@ function angleCoverageLine(sbRow) {
       const zh = angleService.toChineseLabel(sbRow.angle_h, sbRow.angle_v, sbRow.angle_s);
       const en = angleService.toPromptFragment(sbRow.angle_h, sbRow.angle_v, sbRow.angle_s);
       return `镜头角度（机位/景别）：${zh}；${en}`;
-    } catch (_) {
+    } catch(e) { // angleService 调用失败，回退到旧字段
       return sbRow.angle ? String(sbRow.angle).trim() : '';
     }
   }
@@ -359,7 +359,7 @@ function routes(db, log) {
         try {
           const ep = db.prepare('SELECT drama_id FROM episodes WHERE id = ? AND deleted_at IS NULL').get(sb.episode_id);
           dramaId = ep?.drama_id ?? null;
-        } catch (_) {}
+        } catch(e) { log.warn('DB operation failed', { error: e.message }) }
 
         // 画风：mergeCfgStyleWithDrama 会把 dramas.style 的 value（如 cartoon）展开为完整提示词，与图生一致
         let styleZh = '';
@@ -374,7 +374,7 @@ function routes(db, log) {
           cfg = mergeCfgStyleWithDrama(cfg, dr || {});
           styleEn = (cfg?.style?.default_style_en || cfg?.style?.default_style || '').trim();
           styleZh = (cfg?.style?.default_style_zh || '').trim();
-        } catch (_) {}
+        } catch(e) { log.warn('DB operation failed', { error: e.message }) }
         const styleForTokens =
           styleEn ||
           styleZh ||
@@ -399,7 +399,7 @@ function routes(db, log) {
           if (prevShot) {
             prevDesc = (prevShot.action || [prevShot.location, prevShot.time].filter(Boolean).join(' ')).slice(0, 120).trim() || '(first shot)';
             if (prevShot.continuity_snapshot) {
-              try { prevContinuityState = JSON.parse(prevShot.continuity_snapshot); } catch (_) {}
+              try { prevContinuityState = JSON.parse(prevShot.continuity_snapshot); } catch(_) {} // JSON.parse — 字段缺失或格式无效时静默回退
             }
           }
           if (nextShot) nextDesc = (nextShot.action || [nextShot.location, nextShot.time].filter(Boolean).join(' ')).slice(0, 120).trim() || '(last shot)';
@@ -428,7 +428,7 @@ function routes(db, log) {
             if (lib?.name) nameSet.add(lib.name);
           }
           assetNames = [...nameSet].join(', ');
-        } catch (_) {}
+        } catch(e) { log.warn('DB operation failed', { error: e.message }) }
 
         const userPromptLines = [
           ...styleBlockLines,
@@ -476,7 +476,7 @@ function routes(db, log) {
               cleaned, new Date().toISOString(), sbId
             );
             log.info('[分镜] polishPrompt 连戏快照已保存', { id: sbId });
-          } catch (_) {}
+          } catch(_) {} // JSON.parse — 字段缺失或格式无效时静默回退
         }).catch(() => {});
 
         response.success(res, { polished_prompt: polished });
@@ -613,7 +613,7 @@ function routes(db, log) {
           .prepare('SELECT script_content, title FROM episodes WHERE id = ? AND deleted_at IS NULL')
           .get(episodeId);
         scriptText = (ep?.script_content && String(ep.script_content).trim()) || '';
-      } catch (_) {}
+      } catch(e) { log.warn('DB operation failed', { error: e.message }) }
 
       let prevRow = null;
       let nextRow = null;
@@ -632,7 +632,7 @@ function routes(db, log) {
              ORDER BY storyboard_number ASC LIMIT 1`
           )
           .get(episodeId, storyboardNumber);
-      } catch (_) {}
+      } catch(e) { log.warn('DB operation failed', { error: e.message }) }
 
       const polishPassStamp = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
       const polishUserPrompt = [
@@ -723,7 +723,7 @@ function routes(db, log) {
       try {
         const ep0 = db.prepare('SELECT drama_id FROM episodes WHERE id = ? AND deleted_at IS NULL').get(sbRow.episode_id);
         dramaId = ep0?.drama_id ?? null;
-      } catch (_) {}
+      } catch (e) { log.warn('DB operation failed', { error: e.message }) }
 
       let styleEn = '';
       let styleZh = '';
@@ -743,8 +743,8 @@ function routes(db, log) {
           if (meta?.aspect_ratio && String(meta.aspect_ratio).trim()) {
             videoRatio = String(meta.aspect_ratio).trim().replace(/\uFF1A/g, ':');
           }
-        } catch (_) {}
-      } catch (_) {}
+        } catch (_) {} // JSON.parse — 静默回退
+      } catch (e) { log.warn('Operation failed', { error: e.message }) }
 
       const autoComposed = episodeStoryboardService.composeStoryboardVideoPrompt(sbRow, styleEn || styleZh, videoRatio);
       const draftRaw =
@@ -763,7 +763,7 @@ function routes(db, log) {
           .prepare('SELECT script_content FROM episodes WHERE id = ? AND deleted_at IS NULL')
           .get(sbRow.episode_id);
         scriptText = (ep?.script_content && String(ep.script_content).trim()) || '';
-      } catch (_) {}
+      } catch (e) { log.warn('DB operation failed', { error: e.message }) }
 
       let prevRow = null;
       let nextRow = null;
@@ -784,7 +784,7 @@ function routes(db, log) {
              ORDER BY storyboard_number ASC LIMIT 1`
           )
           .get(eid, num);
-      } catch (_) {}
+      } catch (e) { log.warn('DB operation failed', { error: e.message }) }
 
       let dramaTitle = '';
       let episodeTitle = '';
@@ -804,7 +804,7 @@ function routes(db, log) {
           )
           .get(sbRow.episode_id);
         shotTotalInEpisode = cnt?.n != null ? Number(cnt.n) : 0;
-      } catch (_) {}
+      } catch (e) { log.warn('DB operation failed', { error: e.message }) }
 
       const firstFrameAnchor = clipClassicCtx(
         (sbRow.polished_prompt && String(sbRow.polished_prompt).trim()) ||
@@ -830,7 +830,7 @@ function routes(db, log) {
               .join('；');
           }
         }
-      } catch (_) {}
+      } catch (e) { log.warn('DB operation failed', { error: e.message }) }
 
       const fieldLines = [
         ['SHOT_NUM', sbRow.storyboard_number],
@@ -976,7 +976,8 @@ function routes(db, log) {
         const localPath = resolveStoryboardImageLocalPath(db, storageBase, id, row);
         if (!localPath) return response.badRequest(res, '分镜没有本地图片，无法超分');
         const srcFile = path.join(storageBase, localPath);
-        let sharp; try { sharp = require('sharp'); } catch (_) { sharp = null; }
+        const { getSharp } = require('../utils/sharpLoader');
+        const sharp = getSharp();
         if (!sharp) return response.badRequest(res, 'sharp 模块不可用，无法超分');
         const info = await sharp(srcFile).metadata();
         const scale = 2;

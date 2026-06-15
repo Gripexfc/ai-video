@@ -3,7 +3,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { sceneAPI } from '@/api/scenes'
 import { sceneLibraryAPI } from '@/api/sceneLibrary'
 import { uploadAPI } from '@/api/upload'
-import { createLibraryMembershipState, hasAssetInLibrary, loadLibraryMembership, markAssetInLibrary } from './libraryMembership'
+import { dataUrlToFile } from '@/utils/dataUrlToFile'
+import { useLibraryManagement } from './useLibraryManagement'
 
 /**
  * 场景管理 Composable
@@ -23,15 +24,6 @@ import { createLibraryMembershipState, hasAssetInLibrary, loadLibraryMembership,
 export function useScenes(deps) {
   const { store, dramaId, currentEpisodeId, getSelectedStyle, getAssetImageModel, scriptLanguage, loadDrama, pollTask, pollUntilResourceHasImage, hasAssetImage, dramaAPI } = deps
 
-  function dataUrlToFile(dataUrl, filename) {
-    const arr = dataUrl.split(',')
-    const mime = (arr[0].match(/:(.*?);/) || [])[1] || 'image/png'
-    const bstr = atob(arr[1])
-    let n = bstr.length
-    const u8arr = new Uint8Array(n)
-    while (n--) u8arr[n] = bstr.charCodeAt(n)
-    return new File([u8arr], filename || 'reference.png', { type: mime })
-  }
 
   // ── 场景弹窗状态 ──────────────────────────────────────
   const showEditScene = ref(false)
@@ -47,22 +39,66 @@ export function useScenes(deps) {
   const scenesExtracting = ref(false)
   const generatingSceneIds = reactive(new Set())
 
-  // ── 场景库状态 ────────────────────────────────────────
-  const showSceneLibrary = ref(false)
-  const sceneLibraryList = ref([])
-  const sceneLibraryLoading = ref(false)
-  const sceneLibraryPage = ref(1)
-  const sceneLibraryPageSize = ref(20)
-  const sceneLibraryTotal = ref(0)
-  const sceneLibraryKeyword = ref('')
-  const showEditSceneLibrary = ref(false)
-  const editSceneLibraryForm = ref(null)
-  const editSceneLibrarySaving = ref(false)
-  const addingSceneToLibraryId = ref(null)
-  const addingSceneToMaterialId = ref(null)
-  const addingSceneFromLibraryId = ref(null)
-  const sceneMembership = createLibraryMembershipState()
-  let sceneLibraryKeywordTimer = null
+  // ── 场景库（通过 useLibraryManagement 工厂） ────────────
+  const lib = useLibraryManagement({
+    assetType: '场景',
+    dramaId,
+    loadDrama,
+    hasAssetImage,
+    api: sceneLibraryAPI,
+    assetApi: sceneAPI,
+    store,
+    getAssets: () => store.scenes || [],
+    getAssetName: (item) => (item.location || item.time || '未命名').slice(0, 20),
+    addAssetFromLibrary: async (item) => {
+      if (!store.dramaId || !currentEpisodeId.value) return
+      const existingScene = (store.scenes || []).find(s => s.location === item.location)
+      if (existingScene) {
+        await sceneAPI.update(existingScene.id, {
+          location: item.location || existingScene.location,
+          time: item.time || existingScene.time,
+          prompt: existingScene.prompt || item.prompt || '',
+          image_url: item.image_url || existingScene.image_url || undefined,
+          local_path: item.local_path || existingScene.local_path || undefined,
+        })
+        ElMessage.success(`「${item.location || '场景'}」已更新到本集`)
+      } else {
+        await sceneAPI.create({
+          drama_id: store.dramaId,
+          episode_id: currentEpisodeId.value,
+          location: item.location || '',
+          time: item.time || '',
+          prompt: item.prompt || '',
+          image_url: item.image_url || undefined,
+          local_path: item.local_path || undefined,
+        })
+        ElMessage.success(`「${item.location || '场景'}」已加入本集`)
+      }
+      await loadDrama()
+    },
+  })
+  const showSceneLibrary = lib.showLibrary
+  const sceneLibraryList = lib.libraryList
+  const sceneLibraryLoading = lib.libraryLoading
+  const sceneLibraryPage = lib.libraryPage
+  const sceneLibraryPageSize = lib.libraryPageSize
+  const sceneLibraryTotal = lib.libraryTotal
+  const sceneLibraryKeyword = lib.libraryKeyword
+  const showEditSceneLibrary = lib.showEditLibrary
+  const editSceneLibraryForm = lib.editLibraryForm
+  const editSceneLibrarySaving = lib.editLibrarySaving
+  const addingSceneToLibraryId = lib.addingToLibraryId
+  const addingSceneToMaterialId = lib.addingToMaterialId
+  const addingSceneFromLibraryId = lib.addingFromLibraryId
+  const loadSceneLibraryList = lib.loadLibraryList
+  const debouncedLoadSceneLibrary = lib.debouncedLoadLibrary
+  const onAddSceneToLibrary = lib.onAddToLibrary
+  const onAddSceneToMaterialLibrary = lib.onAddToMaterialLibrary
+  const loadSceneLibraryMembership = lib.loadMembership
+  const isSceneInLibrary = lib.isInLibrary
+  const isSceneInMaterialLibrary = lib.isInMaterialLibrary
+  const onAddSceneFromLibrary = lib.onAddFromLibrary
+  const onDeleteSceneLibrary = lib.onDeleteLibrary
 
   // ── 函数 ──────────────────────────────────────────────
   async function onExtractScenes() {
@@ -299,166 +335,27 @@ export function useScenes(deps) {
     }
   }
 
-  // ── 场景库函数 ────────────────────────────────────────
-  async function loadSceneLibraryList() {
-    sceneLibraryLoading.value = true
-    try {
-      const res = await sceneLibraryAPI.list({
-        drama_id: dramaId.value,
-        page: sceneLibraryPage.value,
-        page_size: sceneLibraryPageSize.value,
-        keyword: sceneLibraryKeyword.value || undefined
-      })
-      sceneLibraryList.value = res?.items ?? []
-      const pagination = res?.pagination ?? {}
-      sceneLibraryTotal.value = pagination.total ?? 0
-      if (pagination.page != null) sceneLibraryPage.value = pagination.page
-      if (pagination.page_size != null) sceneLibraryPageSize.value = pagination.page_size
-    } catch (e) {
-      sceneLibraryList.value = []
-    } finally {
-      sceneLibraryLoading.value = false
-    }
-  }
-
-  function debouncedLoadSceneLibrary() {
-    if (sceneLibraryKeywordTimer) clearTimeout(sceneLibraryKeywordTimer)
-    sceneLibraryKeywordTimer = setTimeout(() => {
-      sceneLibraryPage.value = 1
-      loadSceneLibraryList()
-    }, 300)
-  }
+  // ── 场景库函数（由 useLibraryManagement 工厂提供，仅保留适配器）──
 
   function openEditSceneLibrary(item) {
-    editSceneLibraryForm.value = {
-      id: item.id,
+    lib.openEditLibrary(item, {
       location: item.location ?? '',
       time: item.time ?? '',
       category: item.category ?? '',
       description: item.description ?? '',
-      tags: item.tags ?? ''
-    }
-    showEditSceneLibrary.value = true
-  }
-
-  async function submitEditSceneLibrary() {
-    if (!editSceneLibraryForm.value?.id) return
-    editSceneLibrarySaving.value = true
-    try {
-      await sceneLibraryAPI.update(editSceneLibraryForm.value.id, {
-        location: editSceneLibraryForm.value.location,
-        time: editSceneLibraryForm.value.time || null,
-        category: editSceneLibraryForm.value.category || null,
-        description: editSceneLibraryForm.value.description || null,
-        tags: editSceneLibraryForm.value.tags || null
-      })
-      ElMessage.success('已保存')
-      showEditSceneLibrary.value = false
-      loadSceneLibraryList()
-    } catch (e) {
-      ElMessage.error(e.message || '保存失败')
-    } finally {
-      editSceneLibrarySaving.value = false
-    }
-  }
-
-  async function onDeleteSceneLibrary(item) {
-    try {
-      const name = (item.location || item.time || '未命名').slice(0, 20)
-      await ElMessageBox.confirm(
-        `确定删除公共场景「${name}」吗？`,
-        '删除确认',
-        { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
-      )
-      await sceneLibraryAPI.delete(item.id)
-      ElMessage.success('已删除')
-      loadSceneLibraryList()
-    } catch (e) {
-      if (e === 'cancel') return
-      ElMessage.error(e.message || '删除失败')
-    }
-  }
-
-  async function onAddSceneToLibrary(scene) {
-    if (!hasAssetImage(scene)) { ElMessage.warning('请先为该场景生成或上传图片'); return }
-    addingSceneToLibraryId.value = scene.id
-    try {
-      await sceneAPI.addToLibrary(scene.id, {})
-      markAssetInLibrary(sceneMembership.dramaSourceIds, scene)
-      ElMessage.success('已加入本剧场景库')
-      if (showSceneLibrary.value) loadSceneLibraryList()
-    } catch (e) {
-      ElMessage.error(e.message || '加入失败')
-    } finally {
-      addingSceneToLibraryId.value = null
-    }
-  }
-
-  async function onAddSceneToMaterialLibrary(scene) {
-    if (!hasAssetImage(scene)) { ElMessage.warning('请先为该场景生成或上传图片'); return }
-    addingSceneToMaterialId.value = scene.id
-    try {
-      await sceneAPI.addToMaterialLibrary(scene.id)
-      markAssetInLibrary(sceneMembership.materialSourceIds, scene)
-      ElMessage.success('已加入全局素材库')
-    } catch (e) {
-      ElMessage.error(e.message || '加入失败')
-    } finally {
-      addingSceneToMaterialId.value = null
-    }
-  }
-
-  async function loadSceneLibraryMembership() {
-    await loadLibraryMembership({
-      api: sceneLibraryAPI,
-      sourceType: 'scene',
-      assets: store.scenes || [],
-      dramaId: dramaId.value,
-      dramaSourceIds: sceneMembership.dramaSourceIds,
-      materialSourceIds: sceneMembership.materialSourceIds,
+      tags: item.tags ?? '',
     })
   }
 
-  function isSceneInLibrary(scene) {
-    return hasAssetInLibrary(sceneMembership.dramaSourceIds, scene)
+  async function submitEditSceneLibrary() {
+    await lib.submitEditLibrary(['location', 'time', 'category', 'description', 'tags'])
   }
 
-  function isSceneInMaterialLibrary(scene) {
-    return hasAssetInLibrary(sceneMembership.materialSourceIds, scene)
-  }
-
-  async function onAddSceneFromLibrary(item) {
-    if (!store.dramaId || !currentEpisodeId.value) return
-    addingSceneFromLibraryId.value = item.id
-    try {
-      const existingScene = (store.scenes || []).find(s => s.location === item.location)
-      if (existingScene) {
-        await sceneAPI.update(existingScene.id, {
-          location: item.location || existingScene.location,
-          time: item.time || existingScene.time,
-          prompt: existingScene.prompt || item.prompt || '',
-          image_url: item.image_url || existingScene.image_url || undefined,
-          local_path: item.local_path || existingScene.local_path || undefined,
-        })
-        ElMessage.success(`「${item.location || '场景'}」已更新到本集`)
-      } else {
-        await sceneAPI.create({
-          drama_id: store.dramaId,
-          episode_id: currentEpisodeId.value,
-          location: item.location || '',
-          time: item.time || '',
-          prompt: item.prompt || '',
-          image_url: item.image_url || undefined,
-          local_path: item.local_path || undefined,
-        })
-        ElMessage.success(`「${item.location || '场景'}」已加入本集`)
-      }
-      await loadDrama()
-    } catch (e) {
-      ElMessage.error(e.message || '加入失败')
-    } finally {
-      addingSceneFromLibraryId.value = null
-    }
+  /**
+   * 清理所有计时器和轮询，组件卸载时调用
+   */
+  function cleanup() {
+    if (editScenePollTimer) { clearInterval(editScenePollTimer); editScenePollTimer = null }
   }
 
   return {
@@ -511,5 +408,6 @@ export function useScenes(deps) {
     onAddSceneToLibrary,
     onAddSceneToMaterialLibrary,
     onAddSceneFromLibrary,
+    cleanup,
   }
 }

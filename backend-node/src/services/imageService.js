@@ -61,6 +61,7 @@ const uploadService = require('./uploadService');
 const storageLayout = require('./storageLayout');
 const aiClient = require('./aiClient');
 const promptI18n = require('./promptI18n');
+const { getSharp } = require('../utils/sharpLoader');
 
 /**
  * 将四宫格整图拆成 4 张子图，保存到本地，并在 image_generations 表中分别建立记录。
@@ -76,14 +77,18 @@ async function splitQuadGridToImages(db, log, originalRow, absLocalPath, storage
   }
   let sharp;
   try {
-    sharp = require('sharp');
+    sharp = getSharp();
+    if (!sharp) {
+      log.warn('[四宫格拆分] sharp 未安装，跳过拆分');
+      return;
+    }
   } catch (e) {
-    log.warn('[四宫格拆分] sharp 未安装，跳过拆分', { error: e.message });
+    log.warn('[四宫格拆分] sharp 加载失败，跳过拆分', { error: e.message });
     return;
   }
   try {
-    // Windows：避免 libvips 直接 open 含中文路径；读入 Buffer，写出用 fs.writeFileSync
-    const inputBuf = fs.readFileSync(absLocalPath);
+    // Windows：避免 libvips 直接 open 含中文路径；读入 Buffer，写出用 fs.promises.writeFile
+    const inputBuf = await fs.promises.readFile(absLocalPath);
     const meta = await sharp(inputBuf).metadata();
     const w = meta.width;
     const h = meta.height;
@@ -101,7 +106,8 @@ async function splitQuadGridToImages(db, log, originalRow, absLocalPath, storage
     const ext = path.extname(absLocalPath) || '.jpg';
     const base = path.basename(absLocalPath, ext);
     const now = new Date().toISOString();
-    for (const q of quadrants) {
+    // 四宫格拆分并行化：4 个面板同时裁剪+写入，互不依赖
+    await Promise.all(quadrants.map(async (q) => {
       try {
         const panelFilename = `${base}_panel${q.idx}${ext}`;
         // 绝对路径（文件写入）
@@ -118,7 +124,7 @@ async function splitQuadGridToImages(db, log, originalRow, absLocalPath, storage
           .composite([{ input: Buffer.from(labelSvg, 'utf8'), top: 0, left: 0 }])
           .jpeg({ quality: 92 })
           .toBuffer();
-        fs.writeFileSync(absPanelPath, panelBuf);
+        await fs.promises.writeFile(absPanelPath, panelBuf);
         // 推导远端 URL（与原图同目录，只替换文件名）
         const panelImageUrl = imageUrl_
           ? imageUrl_.replace(/[^/\\]+$/, panelFilename)
@@ -144,7 +150,7 @@ async function splitQuadGridToImages(db, log, originalRow, absLocalPath, storage
       } catch (panelErr) {
         log.warn(`[四宫格拆分] 面板 ${q.idx} 失败`, { error: panelErr.message });
       }
-    }
+    }));
     log.info('[四宫格拆分] 完成', { original_id: originalRow.id, storyboard_id: originalRow.storyboard_id });
   } catch (err) {
     log.warn('[四宫格拆分] 整体失败', { error: err.message });
@@ -294,14 +300,18 @@ async function splitNineGridToImages(db, log, originalRow, absLocalPath, storage
   }
   let sharp;
   try {
-    sharp = require('sharp');
+    sharp = getSharp();
+    if (!sharp) {
+      log.warn('[九宫格拆分] sharp 未安装，跳过拆分');
+      return;
+    }
   } catch (e) {
-    log.warn('[九宫格拆分] sharp 未安装，跳过拆分', { error: e.message });
+    log.warn('[九宫格拆分] sharp 加载失败，跳过拆分', { error: e.message });
     return;
   }
   const labels = ['左上', '中上', '右上', '左中', '中间', '右中', '左下', '中下', '右下'];
   try {
-    const inputBuf = fs.readFileSync(absLocalPath);
+    const inputBuf = await fs.promises.readFile(absLocalPath);
     const meta = await sharp(inputBuf).metadata();
     const w = meta.width;
     const h = meta.height;
@@ -322,7 +332,8 @@ async function splitNineGridToImages(db, log, originalRow, absLocalPath, storage
     const ext = path.extname(absLocalPath) || '.jpg';
     const base = path.basename(absLocalPath, ext);
     const now = new Date().toISOString();
-    for (const c of cells) {
+    // 九宫格拆分并行化：9 个面板同时裁剪+写入
+    await Promise.all(cells.map(async (c) => {
       try {
         const panelFilename = `${base}_panel${c.idx}${ext}`;
         const absPanelPath = path.join(absDir, panelFilename);
@@ -336,7 +347,7 @@ async function splitNineGridToImages(db, log, originalRow, absLocalPath, storage
           .composite([{ input: Buffer.from(labelSvg, 'utf8'), top: 0, left: 0 }])
           .jpeg({ quality: 92 })
           .toBuffer();
-        fs.writeFileSync(absPanelPath, panelBuf);
+        await fs.promises.writeFile(absPanelPath, panelBuf);
         const panelImageUrl = imageUrl_ ? imageUrl_.replace(/[^/\\]+$/, panelFilename) : null;
         db.prepare(
           `INSERT INTO image_generations (storyboard_id, drama_id, scene_id, provider, prompt, model, frame_type, image_url, local_path, status, created_at, updated_at, completed_at)
@@ -357,7 +368,7 @@ async function splitNineGridToImages(db, log, originalRow, absLocalPath, storage
       } catch (panelErr) {
         log.warn(`[九宫格拆分] 面板 ${c.idx} 失败`, { error: panelErr.message });
       }
-    }
+    }));
     log.info('[九宫格拆分] 完成', { original_id: originalRow.id, storyboard_id: originalRow.storyboard_id });
   } catch (err) {
     log.warn('[九宫格拆分] 整体失败', { error: err.message });
@@ -399,14 +410,18 @@ async function normalizeLocalImageToTargetSize(absPath, sizeStr, log, meta) {
   if (!dim || !absPath || !fs.existsSync(absPath)) return;
   let sharp;
   try {
-    sharp = require('sharp');
+    sharp = getSharp();
+    if (!sharp) {
+      log.warn('[图生] sharp 不可用，跳过尺寸对齐', meta || {});
+      return;
+    }
   } catch (_) {
     log.warn('[图生] sharp 不可用，跳过尺寸对齐', meta || {});
     return;
   }
   try {
     // Windows：libvips 经路径打开含中文/非 ASCII 目录时常失败（UNKNOWN: unknown error, open '...'），改由 Node 读入 Buffer 再交给 sharp
-    const inputBuf = fs.readFileSync(absPath);
+    const inputBuf = await fs.promises.readFile(absPath);
     const metaIn = await sharp(inputBuf).metadata();
     if (metaIn.width === dim.w && metaIn.height === dim.h) {
       log.info('[图生] 输出尺寸已与目标一致', { ...meta, size: `${dim.w}x${dim.h}` });
@@ -427,7 +442,7 @@ async function normalizeLocalImageToTargetSize(absPath, sizeStr, log, meta) {
     } else {
       buf = await pipeline.jpeg({ quality: 92 }).toBuffer();
     }
-    fs.writeFileSync(absPath, buf);
+    await fs.promises.writeFile(absPath, buf);
     log.info('[图生] 已对齐输出尺寸', {
       ...meta,
       target: `${dim.w}x${dim.h}`,
@@ -718,7 +733,7 @@ async function processImageGeneration(db, log, imageGenId) {
           reference_image_urls = parsed;
           reference_source = 'DB';
         }
-      } catch (_) {}
+      } catch (_) {} // JSON.parse — 静默回退
     }
     if (!reference_image_urls && row.storyboard_id) {
       const sb = db.prepare('SELECT scene_id, characters, angle_s, shot_type FROM storyboards WHERE id = ? AND deleted_at IS NULL').get(row.storyboard_id);
@@ -795,14 +810,14 @@ async function processImageGeneration(db, log, imageGenId) {
               try {
                 const extras = typeof prop.extra_images === 'string' ? JSON.parse(prop.extra_images) : prop.extra_images;
                 if (Array.isArray(extras) && extras[0]) propRef = extras[0];
-              } catch (_) {}
+              } catch (_) {} // JSON.parse — 静默回退
             }
             if (propRef && !refs.includes(propRef)) {
               refs.push(propRef);
               refLabels.push(`Image ${refs.length}: prop/object appearance reference for "${prop.name || 'prop'}"`);
             }
           }
-        } catch (_) {}
+        } catch (e) { log.warn('Operation failed', { error: e.message }) }
         // ── 补充：从 storyboard_characters 关联表查 character_libraries 的四视图 URL ──
         // 若分镜已显式配置 characters JSON，则只保留「当前勾选角色同名」的库条目，避免 UI 已去掉的人仍被当作参考图
         const allowedLibNamesLower = new Set();
@@ -842,7 +857,7 @@ async function processImageGeneration(db, log, imageGenId) {
               coveredNames.add(lib.name);
             }
           }
-        } catch (_) {}
+        } catch (e) { log.warn('Operation failed', { error: e.message }) }
 
         // ── Step 2.1: 文本补扫 — 检测 prompt/action/dialogue 中提及但未关联的角色 ────────────────
         // 若用户已在分镜上显式勾选角色名单（含空数组），则不再根据台词把已去掉的角色塞回参考图。
@@ -856,7 +871,7 @@ async function processImageGeneration(db, log, imageGenId) {
                 'SELECT action, dialogue, result FROM storyboards WHERE id = ? AND deleted_at IS NULL'
               ).get(row.storyboard_id);
               if (sbScan) sbScanText = [sbScan.action, sbScan.dialogue, sbScan.result].filter(Boolean).join(' ');
-            } catch (_) {}
+            } catch (e) { log.warn('Operation failed', { error: e.message }) }
             const scanText = [row.prompt || '', row.description || '', sbScanText].join(' ').toLowerCase();
 
             // 从已有标签中提取已覆盖的角色名（避免重复）
@@ -901,7 +916,7 @@ async function processImageGeneration(db, log, imageGenId) {
                       .run(JSON.stringify(charList), new Date().toISOString(), Number(row.storyboard_id));
                     log.info('[图生] Step2.1 已将角色写入 storyboards.characters', { id: imageGenId, name: dChar.name });
                   }
-                } catch (_) {}
+                } catch (e) { log.warn('DB update failed', { error: e.message }) }
               }
             }
           } catch (scanErr) {
@@ -952,7 +967,7 @@ async function processImageGeneration(db, log, imageGenId) {
             sbTextForFilter = [sbForFilter.action, sbForFilter.dialogue, sbForFilter.result]
               .filter(Boolean).join(' ');
           }
-        } catch (_) {}
+        } catch (e) { log.warn('Operation failed', { error: e.message }) }
         const promptText = [row.prompt || '', row.description || '', sbTextForFilter]
           .join(' ').toLowerCase();
         const labels = reference_context_note.split('\n');
@@ -1019,7 +1034,7 @@ async function processImageGeneration(db, log, imageGenId) {
       try {
         const dr = db.prepare('SELECT style, metadata FROM dramas WHERE id = ? AND deleted_at IS NULL').get(row.drama_id);
         cfg = mergeCfgStyleWithDrama(cfg, dr || {});
-      } catch (_) {}
+      } catch (e) { log.warn('Operation failed', { error: e.message }) }
     }
     const filesBaseUrl = (cfg.storage && cfg.storage.base_url) ? String(cfg.storage.base_url).replace(/\/$/, '') : '';
     const storageLocalPath = path.isAbsolute(cfg.storage?.local_path)
@@ -1034,7 +1049,7 @@ async function processImageGeneration(db, log, imageGenId) {
           const meta = typeof dramaRow.metadata === 'string' ? JSON.parse(dramaRow.metadata) : dramaRow.metadata;
           if (meta && meta.aspect_ratio) imageSize = aspectRatioToSize(meta.aspect_ratio);
         }
-      } catch (_) {}
+      } catch (_) {} // JSON.parse — 静默回退
     }
     if (!imageSize) {
       const cfgRatio = cfg?.style?.default_image_ratio;
@@ -1084,7 +1099,7 @@ async function processImageGeneration(db, log, imageGenId) {
             sbDetail = db.prepare(
               'SELECT action, dialogue, result, atmosphere, shot_type, episode_id, storyboard_number FROM storyboards WHERE id = ? AND deleted_at IS NULL'
             ).get(Number(row.storyboard_id));
-          } catch (_) {}
+          } catch (e) { log.warn('Operation failed', { error: e.message }) }
 
           // 查询前后镜头，用于连续性控制
           let prevDesc = '(first shot)';
@@ -1101,13 +1116,13 @@ async function processImageGeneration(db, log, imageGenId) {
               if (prevShot) {
                 prevDesc = (prevShot.action || [prevShot.location, prevShot.time].filter(Boolean).join(' ')).slice(0, 120).trim() || '(first shot)';
                 if (prevShot.continuity_snapshot) {
-                  try { prevContinuityState = JSON.parse(prevShot.continuity_snapshot); } catch (_) {}
+                  try { prevContinuityState = JSON.parse(prevShot.continuity_snapshot); } catch (_) {} // JSON.parse — 静默回退
                 }
               }
               if (nextShot) {
                 nextDesc = (nextShot.action || [nextShot.location, nextShot.time].filter(Boolean).join(' ')).slice(0, 120).trim() || '(last shot)';
               }
-            } catch (_) {}
+            } catch (e) { log.warn('Operation failed', { error: e.message }) }
           }
 
           const userPromptLines = [
@@ -1143,7 +1158,7 @@ async function processImageGeneration(db, log, imageGenId) {
               db.prepare('UPDATE storyboards SET polished_prompt = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL').run(
                 finalPrompt, nowIso, Number(row.storyboard_id)
               );
-            } catch (_) {}
+            } catch (e) { log.warn('DB update failed', { error: e.message }) }
             log.info('[图生] Step3.5 prompt 优化完成', {
               id: imageGenId,
               original_len: row.prompt.length,
@@ -1226,10 +1241,10 @@ async function processImageGeneration(db, log, imageGenId) {
       if (row.task_id) taskService.updateTaskError(db, row.task_id, result.error);
       log.error('[图生] ✗ API返回错误', { id: imageGenId, error: result.error, total_elapsed: elapsed() });
       if (row.scene_id != null) {
-        try { db.prepare('UPDATE scenes SET error_msg = ?, updated_at = ? WHERE id = ?').run(result.error, now2, row.scene_id); } catch (_) {}
+        try { db.prepare('UPDATE scenes SET error_msg = ?, updated_at = ? WHERE id = ?').run(result.error, now2, row.scene_id); } catch (e) { log.warn('DB update failed', { error: e.message }) }
       }
       if (row.storyboard_id != null) {
-        try { db.prepare('UPDATE storyboards SET error_msg = ?, updated_at = ? WHERE id = ?').run(result.error, now2, row.storyboard_id); } catch (_) {}
+        try { db.prepare('UPDATE storyboards SET error_msg = ?, updated_at = ? WHERE id = ?').run(result.error, now2, row.storyboard_id); } catch (e) { log.warn('DB update failed', { error: e.message }) }
       }
       return;
     }
@@ -1284,7 +1299,7 @@ async function processImageGeneration(db, log, imageGenId) {
       const oldScene = db.prepare('SELECT local_path, image_url, extra_images FROM scenes WHERE id = ?').get(row.scene_id);
       const oldPath = oldScene?.local_path || oldScene?.image_url || '';
       let sceneExtras = [];
-      try { sceneExtras = oldScene?.extra_images ? JSON.parse(oldScene.extra_images) : []; } catch (_) {}
+      try { sceneExtras = oldScene?.extra_images ? JSON.parse(oldScene.extra_images) : []; } catch (_) {} // JSON.parse — 静默回退
       if (!Array.isArray(sceneExtras)) sceneExtras = [];
       if (oldPath && !sceneExtras.includes(oldPath)) sceneExtras.push(oldPath);
       const sceneExtraJson = sceneExtras.length ? JSON.stringify(sceneExtras) : null;
@@ -1334,10 +1349,10 @@ async function processImageGeneration(db, log, imageGenId) {
     if (row.task_id) taskService.updateTaskError(db, row.task_id, err.message);
     log.error('[图生] ✗ 异常', { id: imageGenId, error: err.message, stack: (err.stack || '').slice(0, 400), total_elapsed: elapsed() });
     if (row.scene_id != null) {
-      try { db.prepare('UPDATE scenes SET error_msg = ?, updated_at = ? WHERE id = ?').run(err.message, now2, row.scene_id); } catch (_) {}
+      try { db.prepare('UPDATE scenes SET error_msg = ?, updated_at = ? WHERE id = ?').run(err.message, now2, row.scene_id); } catch (e) { log.warn('DB update failed', { error: e.message }) }
     }
     if (row.storyboard_id != null) {
-      try { db.prepare('UPDATE storyboards SET error_msg = ?, updated_at = ? WHERE id = ?').run(err.message, now2, row.storyboard_id); } catch (_) {}
+      try { db.prepare('UPDATE storyboards SET error_msg = ?, updated_at = ? WHERE id = ?').run(err.message, now2, row.storyboard_id); } catch (e) { log.warn('DB update failed', { error: e.message }) }
     }
   }
 }
@@ -1401,7 +1416,7 @@ function syncStoryboardCharacters(db, log, storyboardId) {
     try {
       const ep = db.prepare('SELECT drama_id FROM episodes WHERE id = ? AND deleted_at IS NULL').get(sb.episode_id);
       dramaId = ep?.drama_id ?? null;
-    } catch (_) {}
+    } catch (e) { log.warn('Operation failed', { error: e.message }) }
     if (!dramaId) return { added };
 
     // 构造扫描文本

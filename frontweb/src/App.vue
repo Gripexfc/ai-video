@@ -1,6 +1,10 @@
 <template>
   <div class="app">
-    <router-view />
+    <router-view v-slot="{ Component }">
+      <transition name="page-fade" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </router-view>
   </div>
 </template>
 
@@ -11,12 +15,5 @@
 * {
   box-sizing: border-box;
 }
-html, body, #app, .app {
-  margin: 0;
-  padding: 0;
-  min-height: 100vh;
-  background: var(--bg-page);
-  color: var(--text-primary);
-  transition: background 0.25s, color 0.25s;
-}
+/* Page transition — duplicates removed (already in theme.css) */
 </style>

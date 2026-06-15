@@ -22,5 +22,23 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  optimizeDeps: {
+    include: ['vue', 'vue-router', 'pinia', 'axios', 'element-plus', '@element-plus/icons-vue']
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          'element-plus': ['element-plus', '@element-plus/icons-vue'],
+          'axios': ['axios'],
+        }
+      }
+    },
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 500,
+    target: 'es2020',
+    minify: 'esbuild',
   }
 })
